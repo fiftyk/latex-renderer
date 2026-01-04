@@ -1,29 +1,31 @@
 package renderer
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
-	"log"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/cdproto/emulation"
 )
 
-// Renderer LaTeX 渲染器 (优化版：单浏览器 + 复用 tab)
+// Renderer LaTeX 渲染器 (每次请求创建新 tab)
 type Renderer struct {
-	browser    context.Context
-	cancel     context.CancelFunc
-	mu         sync.Mutex
-	template   *template.Template
+	allocOpts []chromedp.ExecAllocatorOption
 }
 
-// NewRenderer 创建渲染器 (启动驻留浏览器)
+// RenderOptions 渲染选项
+type RenderOptions struct {
+	Latex      string // LaTeX 公式
+	Color      string // 字体颜色 (默认 black)
+	Background string // 背景颜色 (默认 transparent)
+	FontSize   string // 字体大小 px (默认 16)
+	Padding    string // 内边距 px (默认 20)
+}
+
+// NewRenderer 创建渲染器
 func NewRenderer(execPath, args string) (*Renderer, error) {
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
@@ -48,18 +50,33 @@ func NewRenderer(execPath, args string) (*Renderer, error) {
 		opts = append(opts, chromedp.ExecPath(execPath))
 	}
 
-	// 创建驻留浏览器
-	browserCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	ctx, cancel := chromedp.NewContext(browserCtx, chromedp.WithLogf(log.Printf))
+	return &Renderer{
+		allocOpts: opts,
+	}, nil
+}
 
-	// 启动浏览器
-	if err := chromedp.Run(ctx); err != nil {
-		cancel()
-		return nil, fmt.Errorf("启动浏览器失败: %w", err)
+// Render 渲染 LaTeX 为图片 (每次请求创建新 browser + tab)
+func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, error) {
+	// 设置默认值
+	color := opts.Color
+	if color == "" {
+		color = "black"
+	}
+	background := opts.Background
+	if background == "" {
+		background = "transparent"
+	}
+	fontSize := opts.FontSize
+	if fontSize == "" {
+		fontSize = "16"
+	}
+	padding := opts.Padding
+	if padding == "" {
+		padding = "20"
 	}
 
-	// 解析 HTML 模板
-	tmpl := `<!DOCTYPE html>
+	// 生成 HTML
+	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -68,81 +85,50 @@ func NewRenderer(execPath, args string) (*Renderer, error) {
   <style>
     body {
       margin: 0;
-      padding: 20px;
+      padding: %spx;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      background-color: transparent;
+      background-color: %s;
     }
     .katex {
-      font-size: {{.Scale}}em;
-      color: {{.Color}};
+      font-size: %spx;
+      color: %s;
     }
   </style>
 </head>
 <body>
   <div id="formula"></div>
   <script>
-    katex.render("{{.Latex}}", document.getElementById('formula'), {
+    katex.render(%q, document.getElementById('formula'), {
       displayMode: true,
       throwOnError: false,
       output: 'html'
     });
   </script>
 </body>
-</html>`
+</html>`, padding, background, fontSize, color, opts.Latex)
 
-	t, err := template.New("latex").Parse(tmpl)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("解析模板失败: %w", err)
-	}
-
-	return &Renderer{
-		browser:  ctx,
-		cancel:   cancel,
-		template: t,
-	}, nil
-}
-
-// RenderRequest 渲染请求
-type RenderRequest struct {
-	Latex  string
-	Scale  float64
-	Color  string
-}
-
-// RenderResult 渲染结果
-type RenderResult struct {
-	Data   []byte
-	Width  int
-	Height int
-}
-
-// Render 渲染 LaTeX 为图片 (复用 tab，无需重新启动浏览器)
-func (r *Renderer) Render(ctx context.Context, req *RenderRequest) (*RenderResult, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	// 生成 HTML
-	html := r.generateHTML(req)
-
-	// 设置超时
-	timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// 创建新的 browser + tab
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), r.allocOpts...)
 	defer cancel()
 
-	// 执行渲染 - 复用同一个 tab
+	// 创建新 context 和 tab
+	browserCtx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+
+	// 设置超时
+	ctx, cancel = context.WithTimeout(browserCtx, 30*time.Second)
+	defer cancel()
+
+	// 执行渲染
 	var buf []byte
 
-	err := chromedp.Run(timeoutCtx,
-		// 设置视口
+	err := chromedp.Run(ctx,
 		emulation.SetDeviceMetricsOverride(1920, 1080, 1.0, false),
-		// 导航到 HTML
 		chromedp.Navigate(`data:text/html,`+html),
-		// 等待 KaTeX 渲染完成
 		chromedp.WaitVisible(`.katex`, chromedp.ByQuery),
-		// 截图
 		chromedp.Screenshot(`.katex`, &buf, chromedp.ByQuery),
 	)
 
@@ -150,46 +136,16 @@ func (r *Renderer) Render(ctx context.Context, req *RenderRequest) (*RenderResul
 		return nil, fmt.Errorf("渲染失败: %w", err)
 	}
 
-	return &RenderResult{
-		Data:   buf,
-		Width:  1920,
-		Height: 1080,
-	}, nil
+	return buf, nil
 }
 
 // RenderToPNG 渲染为 PNG
-func (r *Renderer) RenderToPNG(ctx context.Context, latex string, scale, color string) ([]byte, error) {
-	scaleFloat := 2.0
-	fmt.Sscanf(scale, "%f", &scaleFloat)
-
-	req := &RenderRequest{
-		Latex: latex,
-		Scale: scaleFloat,
-		Color: color,
-	}
-
-	result, err := r.Render(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.Data, nil
-}
-
-// generateHTML 生成 HTML
-func (r *Renderer) generateHTML(req *RenderRequest) string {
-	var buf bytes.Buffer
-	if err := r.template.Execute(&buf, req); err != nil {
-		return fmt.Sprintf("<html><body>模板执行错误: %v</body></html>", err)
-	}
-	return buf.String()
+func (r *Renderer) RenderToPNG(ctx context.Context, opts *RenderOptions) ([]byte, error) {
+	return r.Render(ctx, opts)
 }
 
 // Close 关闭渲染器
 func (r *Renderer) Close() error {
-	if r.cancel != nil {
-		r.cancel()
-	}
 	return nil
 }
 

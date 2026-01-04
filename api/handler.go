@@ -29,10 +29,13 @@ func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration) *Handler
 
 // RenderRequest 渲染请求参数
 type RenderRequest struct {
-	Latex    string  `form:"latex" binding:"required"`
-	Format   string  `form:"format"`
-	Scale    string  `form:"scale"`
-	Color    string  `form:"color"`
+	Latex      string `form:"latex" binding:"required"`
+	Format     string `form:"format"`
+	Scale      string `form:"scale"`
+	Color      string `form:"color"`
+	Background string `form:"background"`
+	FontSize   string `form:"fontSize"`
+	Padding    string `form:"padding"`
 }
 
 // RenderResponse 渲染响应
@@ -64,6 +67,15 @@ func (h *Handler) Render(c *gin.Context) {
 	if req.Color == "" {
 		req.Color = "black"
 	}
+	if req.Background == "" {
+		req.Background = "transparent"
+	}
+	if req.FontSize == "" {
+		req.FontSize = "16"
+	}
+	if req.Padding == "" {
+		req.Padding = "20"
+	}
 
 	// 验证 format
 	if req.Format != "png" && req.Format != "jpeg" && req.Format != "jpg" {
@@ -74,23 +86,27 @@ func (h *Handler) Render(c *gin.Context) {
 		return
 	}
 
-	// 生成缓存 key
-	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, 2.0, req.Color)
+	// 生成缓存 key (包含所有样式参数)
+	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.Scale, req.Color, req.Background, req.FontSize, req.Padding)
 
 	// 尝试从缓存获取
 	data, err := h.cache.Get(c.Request.Context(), cacheKey)
 	if err != nil {
-		// 记录错误但继续渲染
 		c.Writer.Header().Set("X-Cache", "error")
 	} else if data != nil {
-		// 缓存命中
 		c.Writer.Header().Set("X-Cache", "hit")
 		h.writeImage(c, data, req.Format)
 		return
 	}
 
 	// 缓存未命中，渲染图片
-	data, err = h.renderer.RenderToPNG(c.Request.Context(), req.Latex, req.Scale, req.Color)
+	data, err = h.renderer.RenderToPNG(c.Request.Context(), &renderer.RenderOptions{
+		Latex:      req.Latex,
+		Color:      req.Color,
+		Background: req.Background,
+		FontSize:   req.FontSize,
+		Padding:    req.Padding,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, RenderResponse{
 			Success: false,
@@ -101,7 +117,6 @@ func (h *Handler) Render(c *gin.Context) {
 
 	// 写入缓存
 	if err := h.cache.Set(c.Request.Context(), cacheKey, data, h.ttl); err != nil {
-		// 记录错误但不影响返回
 		c.Writer.Header().Set("X-Cache", "write-error")
 	} else {
 		c.Writer.Header().Set("X-Cache", "miss")

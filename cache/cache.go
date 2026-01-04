@@ -46,8 +46,8 @@ type OSSConfig struct {
 }
 
 // GenerateCacheKey 生成缓存 key
-func GenerateCacheKey(latex, format string, scale float64, color string) string {
-	content := fmt.Sprintf("%s|%s|%.1f|%s", latex, format, scale, color)
+func GenerateCacheKey(latex, format, scale, color, background, fontSize, padding string) string {
+	content := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s", latex, format, scale, color, background, fontSize, padding)
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(content)))
 	return fmt.Sprintf("latex/%s.%s", hash, format)
 }
