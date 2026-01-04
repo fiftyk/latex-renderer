@@ -1,0 +1,186 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/spf13/viper"
+
+	"latex-renderer/cache"
+)
+
+// Config 应用配置
+type Config struct {
+	Server ServerConfig    `mapstructure:"server"`
+	Cache  cacheConfig     `mapstructure:"cache"`
+	Chrome ChromeConfig    `mapstructure:"chrome"`
+}
+
+// ServerConfig 服务器配置
+type ServerConfig struct {
+	Port int    `mapstructure:"port"`
+	Host string `mapstructure:"host"`
+}
+
+// ChromeConfig Chrome 配置
+type ChromeConfig struct {
+	ExecutablePath string `mapstructure:"executable_path"`
+	Args           string `mapstructure:"args"`
+}
+
+// cacheConfig 缓存配置
+type cacheConfig struct {
+	Type   string               `mapstructure:"type"`
+	TTL    time.Duration        `mapstructure:"ttl"`
+	Local  cache.LocalConfig    `mapstructure:"local"`
+	OSS    cache.OSSConfig      `mapstructure:"oss"`
+}
+
+// Load 加载配置
+func Load(path string) (*Config, error) {
+	viper.SetConfigFile(path)
+	viper.SetConfigType("yaml")
+
+	// 允许环境变量覆盖
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// 读取配置
+	if err := viper.ReadInConfig(); err != nil {
+		if os.IsNotExist(err) {
+			// 文件不存在，使用默认配置
+			return Default(), nil
+		}
+		return nil, fmt.Errorf("读取配置文件失败: %w", err)
+	}
+
+	cfg := &Config{}
+	if err := viper.Unmarshal(cfg); err != nil {
+		return nil, fmt.Errorf("解析配置文件失败: %w", err)
+	}
+
+	// 设置默认值
+	setDefaults(cfg)
+
+	return cfg, nil
+}
+
+// LoadFromEnv 从环境变量加载配置
+func LoadFromEnv() (*Config, error) {
+	cfg := Default()
+
+	// 从环境变量读取
+	if v := os.Getenv("SERVER_PORT"); v != "" {
+		fmt.Sscanf(v, "%d", &cfg.Server.Port)
+	}
+	if v := os.Getenv("SERVER_HOST"); v != "" {
+		cfg.Server.Host = v
+	}
+	if v := os.Getenv("CACHE_TYPE"); v != "" {
+		cfg.Cache.Type = v
+	}
+	if v := os.Getenv("CACHE_TTL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil {
+			cfg.Cache.TTL = d
+		}
+	}
+
+	// OSS 配置
+	if v := os.Getenv("OSS_ENDPOINT"); v != "" {
+		cfg.Cache.OSS.Endpoint = v
+	}
+	if v := os.Getenv("OSS_BUCKET"); v != "" {
+		cfg.Cache.OSS.Bucket = v
+	}
+	if v := os.Getenv("OSS_ACCESS_KEY"); v != "" {
+		cfg.Cache.OSS.AccessKey = v
+	}
+	if v := os.Getenv("OSS_SECRET_KEY"); v != "" {
+		cfg.Cache.OSS.SecretKey = v
+	}
+	if v := os.Getenv("OSS_DOMAIN"); v != "" {
+		cfg.Cache.OSS.Domain = v
+	}
+	if v := os.Getenv("OSS_TTL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil {
+			cfg.Cache.OSS.TTL = d
+		}
+	}
+
+	// 本地缓存配置
+	if v := os.Getenv("CACHE_LOCAL_DIR"); v != "" {
+		cfg.Cache.Local.Dir = v
+	}
+	if v := os.Getenv("CACHE_LOCAL_TTL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil {
+			cfg.Cache.Local.TTL = d
+		}
+	}
+
+	// Chrome 配置
+	if v := os.Getenv("CHROME_EXECUTABLE_PATH"); v != "" {
+		cfg.Chrome.ExecutablePath = v
+	}
+	if v := os.Getenv("CHROME_ARGS"); v != "" {
+		cfg.Chrome.Args = v
+	}
+
+	return cfg, nil
+}
+
+// Default 返回默认配置
+func Default() *Config {
+	return &Config{
+		Server: ServerConfig{
+			Port: 8080,
+			Host: "0.0.0.0",
+		},
+		Cache: cacheConfig{
+			Type: "local",
+			TTL:  168 * time.Hour,
+			Local: cache.LocalConfig{
+				Dir: "./cache",
+				TTL: 168 * time.Hour,
+			},
+			OSS: cache.OSSConfig{
+				TTL: 168 * time.Hour,
+			},
+		},
+		Chrome: ChromeConfig{
+			Args: "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage",
+		},
+	}
+}
+
+// setDefaults 设置默认值
+func setDefaults(cfg *Config) {
+	if cfg.Server.Port == 0 {
+		cfg.Server.Port = 8080
+	}
+	if cfg.Server.Host == "" {
+		cfg.Server.Host = "0.0.0.0"
+	}
+	if cfg.Cache.Type == "" {
+		cfg.Cache.Type = "local"
+	}
+	if cfg.Cache.TTL == 0 {
+		cfg.Cache.TTL = 168 * time.Hour
+	}
+	if cfg.Cache.Local.Dir == "" {
+		cfg.Cache.Local.Dir = "./cache"
+	}
+	if cfg.Cache.Local.TTL == 0 {
+		cfg.Cache.Local.TTL = 168 * time.Hour
+	}
+	if cfg.Cache.OSS.TTL == 0 {
+		cfg.Cache.OSS.TTL = 168 * time.Hour
+	}
+	if cfg.Chrome.Args == "" {
+		cfg.Chrome.Args = "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
+	}
+}
