@@ -6,10 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"latex-renderer/api"
-	"latex-renderer/cache"
-	"latex-renderer/config"
-	"latex-renderer/renderer"
+	"github.com/ruxuwu/latex-renderer/api"
+	"github.com/ruxuwu/latex-renderer/cache"
+	"github.com/ruxuwu/latex-renderer/config"
+	"github.com/ruxuwu/latex-renderer/renderer"
 )
 
 func main() {
@@ -23,14 +23,14 @@ func main() {
 	var cacheImpl cache.Cache
 	switch cfg.Cache.Type {
 	case "oss":
-		cacheImpl, err = cache.NewOSSCache(cfg.Cache.OSS)
+		cacheImpl, err = cache.NewOSSCache(&cfg.Cache.OSS)
 		if err != nil {
 			log.Fatalf("初始化 OSS 缓存失败: %v", err)
 		}
 		log.Printf("使用 OSS 缓存: %s", cfg.Cache.OSS.Endpoint)
 	default:
 		// 默认使用本地缓存
-		cacheImpl, err = cache.NewLocalCache(cfg.Cache.Local)
+		cacheImpl, err = cache.NewLocalCache(&cfg.Cache.Local)
 		if err != nil {
 			log.Fatalf("初始化本地缓存失败: %v", err)
 		}

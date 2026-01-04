@@ -22,7 +22,7 @@ type OSSCache struct {
 }
 
 // NewOSSCache 创建 OSS 缓存实例
-func NewOSSCache(cfg OSSConfig) (*OSSCache, error) {
+func NewOSSCache(cfg *OSSConfig) (*OSSCache, error) {
 	if cfg.Endpoint == "" {
 		return nil, fmt.Errorf("OSS endpoint 不能为空")
 	}

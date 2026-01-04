@@ -15,7 +15,7 @@ type LocalCache struct {
 }
 
 // NewLocalCache 创建本地缓存实例
-func NewLocalCache(cfg LocalConfig) (*LocalCache, error) {
+func NewLocalCache(cfg *LocalConfig) (*LocalCache, error) {
 	if cfg.Dir == "" {
 		cfg.Dir = "./cache"
 	}

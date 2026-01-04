@@ -1,4 +1,4 @@
-module latex-renderer
+module github.com/ruxuwu/latex-renderer
 
 go 1.24.0
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"latex-renderer/cache"
+	"github.com/ruxuwu/latex-renderer/cache"
 )
 
 // Config 应用配置

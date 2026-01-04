@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"latex-renderer/cache"
-	"latex-renderer/renderer"
+	"github.com/ruxuwu/latex-renderer/cache"
+	"github.com/ruxuwu/latex-renderer/renderer"
 )
 
 // Handler HTTP 处理器
