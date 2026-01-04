@@ -1,0 +1,6 @@
+cache/
+latex-renderer
+.git
+*.md
+*.log
+.DS_Store
