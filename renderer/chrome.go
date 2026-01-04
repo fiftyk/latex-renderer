@@ -119,7 +119,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 	defer cancel()
 
 	// 设置超时
-	ctx, cancel = context.WithTimeout(browserCtx, 30*time.Second)
+	ctx, cancel = context.WithTimeout(browserCtx, 60*time.Second)
 	defer cancel()
 
 	// 执行渲染
