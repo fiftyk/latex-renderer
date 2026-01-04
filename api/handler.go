@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -66,9 +67,13 @@ func (h *Handler) Render(c *gin.Context) {
 	}
 	if req.Color == "" {
 		req.Color = "black"
+	} else if !strings.HasPrefix(req.Color, "#") {
+		req.Color = "#" + req.Color
 	}
 	if req.Background == "" {
 		req.Background = "transparent"
+	} else if !strings.HasPrefix(req.Background, "#") {
+		req.Background = "#" + req.Background
 	}
 	if req.FontSize == "" {
 		req.FontSize = "16"

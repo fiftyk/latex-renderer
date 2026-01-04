@@ -22,8 +22,8 @@ GET /api?latex=<LaTeX公式>
 | 参数 | 必填 | 默认值 | 说明 | 示例 |
 |------|------|--------|------|------|
 | `latex` | 是 | - | LaTeX 公式内容 | `latex=E=mc^2` |
-| `color` | 否 | black | 字体颜色 (hex) | `color=%23ff0000` |
-| `background` | 否 | transparent | 背景颜色 (hex) | `background=%23ffffff` |
+| `color` | 否 | black | 字体颜色 (如 ff0000) | `color=ff0000` |
+| `background` | 否 | transparent | 背景颜色 (如 ffffff) | `background=ffffff` |
 | `fontSize` | 否 | 16 | 字体大小 (px, 8-72) | `fontSize=24` |
 | `padding` | 否 | 20 | 内边距 (px, 0-200) | `padding=50` |
 
@@ -34,19 +34,19 @@ GET /api?latex=<LaTeX公式>
 curl "http://localhost:8080/api?latex=E=mc^2" -o formula.png
 
 # 红色字体
-curl "http://localhost:8080/api?latex=E=mc^2&color=%23ff0000" -o red.png
+curl "http://localhost:8080/api?latex=E=mc^2&color=ff0000" -o red.png
 
 # 蓝色字体 + 24px
-curl "http://localhost:8080/api?latex=E=mc^2&color=%230000ff&fontSize=24" -o blue.png
+curl "http://localhost:8080/api?latex=E=mc^2&color=0000ff&fontSize=24" -o blue.png
 
 # 白色背景
-curl "http://localhost:8080/api?latex=\sum_{i=1}^n&background=%23ffffff" -o white-bg.png
+curl "http://localhost:8080/api?latex=\sum_{i=1}^n&background=ffffff" -o white-bg.png
 
 # 大内边距
 curl "http://localhost:8080/api?latex=\int_{0}^{\infty}&padding=50" -o padded.png
 
 # 完整定制 (绿色 + 白色背景 + 32px + 30px 内边距)
-curl "http://localhost:8080/api?latex=f(x)=\int_{-\infty}^{\infty}\hat{f}(\xi)e^{2\pi i\xi x}d\xi&color=%2300ff00&background=%23ffffff&fontSize=32&padding=30" -o full-custom.png
+curl "http://localhost:8080/api?latex=f(x)=\int_{-\infty}^{\infty}\hat{f}(\xi)e^{2\pi i\xi x}d\xi&color=00ff00&background=ffffff&fontSize=32&padding=30" -o full-custom.png
 ```
 
 ### 其他接口
