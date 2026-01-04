@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,13 +29,11 @@ func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration) *Handler
 
 // RenderRequest 渲染请求参数
 type RenderRequest struct {
-	Latex      string `form:"latex" binding:"required"`
-	Format     string `form:"format"`
-	Scale      string `form:"scale"`
-	Color      string `form:"color"`
-	Background string `form:"background"`
-	FontSize   string `form:"fontSize"`
-	Padding    string `form:"padding"`
+	Latex    string `form:"latex" binding:"required"`
+	Format   string `form:"format"`
+	Scale    string `form:"scale"`
+	FontSize string `form:"fontSize"`
+	Padding  string `form:"padding"`
 }
 
 // RenderResponse 渲染响应
@@ -65,16 +62,6 @@ func (h *Handler) Render(c *gin.Context) {
 	if req.Scale == "" {
 		req.Scale = "2"
 	}
-	if req.Color == "" {
-		req.Color = "black"
-	} else if !strings.HasPrefix(req.Color, "#") {
-		req.Color = "#" + req.Color
-	}
-	if req.Background == "" {
-		req.Background = "transparent"
-	} else if !strings.HasPrefix(req.Background, "#") {
-		req.Background = "#" + req.Background
-	}
 	if req.FontSize == "" {
 		req.FontSize = "16"
 	}
@@ -91,8 +78,8 @@ func (h *Handler) Render(c *gin.Context) {
 		return
 	}
 
-	// 生成缓存 key (包含所有样式参数)
-	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.Scale, req.Color, req.Background, req.FontSize, req.Padding)
+	// 生成缓存 key
+	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.Scale, req.FontSize, req.Padding)
 
 	// 尝试从缓存获取
 	data, err := h.cache.Get(c.Request.Context(), cacheKey)
@@ -100,17 +87,15 @@ func (h *Handler) Render(c *gin.Context) {
 		c.Writer.Header().Set("X-Cache", "error")
 	} else if data != nil {
 		c.Writer.Header().Set("X-Cache", "hit")
-		h.writeImage(c, data, req.Format)
+		h.writeImage(c, data)
 		return
 	}
 
 	// 缓存未命中，渲染图片
 	data, err = h.renderer.RenderToPNG(c.Request.Context(), &renderer.RenderOptions{
-		Latex:      req.Latex,
-		Color:      req.Color,
-		Background: req.Background,
-		FontSize:   req.FontSize,
-		Padding:    req.Padding,
+		Latex:    req.Latex,
+		FontSize: req.FontSize,
+		Padding:  req.Padding,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, RenderResponse{
@@ -128,11 +113,11 @@ func (h *Handler) Render(c *gin.Context) {
 	}
 
 	// 返回图片
-	h.writeImage(c, data, req.Format)
+	h.writeImage(c, data)
 }
 
 // writeImage 写入图片响应
-func (h *Handler) writeImage(c *gin.Context, data []byte, format string) {
+func (h *Handler) writeImage(c *gin.Context, data []byte) {
 	c.Writer.Header().Set("Content-Type", "image/png")
 	c.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	c.Writer.Header().Set("Cache-Control", "public, max-age=31536000")

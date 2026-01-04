@@ -22,8 +22,6 @@ GET /api?latex=<LaTeX公式>
 | 参数 | 必填 | 默认值 | 说明 | 示例 |
 |------|------|--------|------|------|
 | `latex` | 是 | - | LaTeX 公式内容 | `latex=E=mc^2` |
-| `color` | 否 | black | 字体颜色 (如 ff0000) | `color=ff0000` |
-| `background` | 否 | transparent | 背景颜色 (如 ffffff) | `background=ffffff` |
 | `fontSize` | 否 | 16 | 字体大小 (px, 8-72) | `fontSize=24` |
 | `padding` | 否 | 20 | 内边距 (px, 0-200) | `padding=50` |
 
@@ -33,20 +31,11 @@ GET /api?latex=<LaTeX公式>
 # 基础用法
 curl "http://localhost:8080/api?latex=E=mc^2" -o formula.png
 
-# 红色字体
-curl "http://localhost:8080/api?latex=E=mc^2&color=ff0000" -o red.png
-
-# 蓝色字体 + 24px
-curl "http://localhost:8080/api?latex=E=mc^2&color=0000ff&fontSize=24" -o blue.png
-
-# 白色背景
-curl "http://localhost:8080/api?latex=\sum_{i=1}^n&background=ffffff" -o white-bg.png
+# 大字体
+curl "http://localhost:8080/api?latex=E=mc^2&fontSize=24" -o large.png
 
 # 大内边距
 curl "http://localhost:8080/api?latex=\int_{0}^{\infty}&padding=50" -o padded.png
-
-# 完整定制 (绿色 + 白色背景 + 32px + 30px 内边距)
-curl "http://localhost:8080/api?latex=f(x)=\int_{-\infty}^{\infty}\hat{f}(\xi)e^{2\pi i\xi x}d\xi&color=00ff00&background=ffffff&fontSize=32&padding=30" -o full-custom.png
 ```
 
 ### 其他接口
@@ -136,7 +125,7 @@ OSS_SECRET_KEY=your-secret-key \
 |------|------|
 | 首次请求 | 渲染公式并写入缓存 |
 | 后续请求 | 直接返回缓存数据 (响应 < 1ms) |
-| 缓存 Key | `md5(latex|format|color|background|fontSize|padding)` |
+| 缓存 Key | `md5(latex|format|fontSize|padding)` |
 
 ## 性能数据
 
@@ -144,25 +133,6 @@ OSS_SECRET_KEY=your-secret-key \
 |------|----------|
 | 首次渲染 (冷启动) | ~5s |
 | 缓存命中 | < 1ms |
-
-## 项目结构
-
-```
-latex-renderer/
-├── main.go              # 主入口
-├── api/
-│   ├── handler.go       # HTTP 处理器
-│   └── routes.go        # 路由定义
-├── cache/
-│   ├── cache.go         # 缓存接口
-│   ├── local.go         # 本地文件系统缓存
-│   └── oss.go           # OSS 缓存
-├── config/
-│   └── config.go        # 配置管理
-├── renderer/
-│   └── chrome.go        # Chrome 渲染器
-└── README.md
-```
 
 ## 许可证
 

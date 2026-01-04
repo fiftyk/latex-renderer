@@ -10,84 +10,61 @@ import (
 
 func TestGenerateCacheKey(t *testing.T) {
 	tests := []struct {
-		name   string
-		latex1 string
-		format1 string
+		name    string
+		latex1  string
 		scale1  string
-		color1  string
+		font1   string
 		latex2  string
-		format2 string
 		scale2  string
-		color2  string
-		want   bool // 是否期望相同 key
+		font2   string
+		want    bool
 	}{
 		{
 			name:   "same formula produces same key",
 			latex1: "\\frac{a}{b}",
-			format1: "png",
-			scale1:  "2",
-			color1:  "black",
-			latex2:  "\\frac{a}{b}",
-			format2: "png",
-			scale2:  "2",
-			color2:  "black",
-			want:    true,
+			scale1: "2",
+			font1:  "16",
+			latex2: "\\frac{a}{b}",
+			scale2: "2",
+			font2:  "16",
+			want:   true,
 		},
 		{
 			name:   "different formula produces different key",
 			latex1: "\\frac{a}{b}",
-			format1: "png",
-			scale1:  "2",
-			color1:  "black",
-			latex2:  "\\frac{c}{d}",
-			format2: "png",
-			scale2:  "2",
-			color2:  "black",
-			want:    false,
-		},
-		{
-			name:   "different format produces different key",
-			latex1: "\\frac{a}{b}",
-			format1: "png",
-			scale1:  "2",
-			color1:  "black",
-			latex2:  "\\frac{a}{b}",
-			format2: "jpeg",
-			scale2:  "2",
-			color2:  "black",
-			want:    false,
+			scale1: "2",
+			font1:  "16",
+			latex2: "\\frac{c}{d}",
+			scale2: "2",
+			font2:  "16",
+			want:   false,
 		},
 		{
 			name:   "different scale produces different key",
 			latex1: "\\frac{a}{b}",
-			format1: "png",
-			scale1:  "2",
-			color1:  "black",
-			latex2:  "\\frac{a}{b}",
-			format2: "png",
-			scale2:  "4",
-			color2:  "black",
-			want:    false,
+			scale1: "2",
+			font1:  "16",
+			latex2: "\\frac{a}{b}",
+			scale2: "4",
+			font2:  "16",
+			want:   false,
 		},
 		{
-			name:   "different color produces different key",
+			name:   "different fontSize produces different key",
 			latex1: "\\frac{a}{b}",
-			format1: "png",
-			scale1:  "2",
-			color1:  "black",
-			latex2:  "\\frac{a}{b}",
-			format2: "png",
-			scale2:  "2",
-			color2:  "red",
-			want:    false,
+			scale1: "2",
+			font1:  "16",
+			latex2: "\\frac{a}{b}",
+			scale2: "2",
+			font2:  "24",
+			want:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 使用默认的背景、字体大小和内边距
-			key1 := GenerateCacheKey(tt.latex1, tt.format1, tt.scale1, tt.color1, "transparent", "16", "20")
-			key2 := GenerateCacheKey(tt.latex2, tt.format2, tt.scale2, tt.color2, "transparent", "16", "20")
+			key1 := GenerateCacheKey(tt.latex1, "png", tt.scale1, tt.font1, "20")
+			key2 := GenerateCacheKey(tt.latex2, "png", tt.scale2, tt.font2, "20")
 
 			if tt.want {
 				if key1 != key2 {
