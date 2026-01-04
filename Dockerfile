@@ -1,5 +1,10 @@
+# 构建参数：镜像仓库地址
+# 使用示例：
+#   docker build --build-arg DOCKER_REGISTRY=registry.docker-cn.com -t latex-renderer .
+ARG DOCKER_REGISTRY=docker.io
+
 # 构建阶段
-FROM golang:1.21-alpine AS builder
+FROM ${DOCKER_REGISTRY}/golang:1.21-alpine AS builder
 
 WORKDIR /app
 
@@ -14,7 +19,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o latex-renderer .
 
 # 运行阶段
-FROM chrome:latest
+FROM ${DOCKER_REGISTRY}/chrome:latest
 
 # 安装中文字体支持（可选）
 RUN apt-get update && apt-get install -y \
