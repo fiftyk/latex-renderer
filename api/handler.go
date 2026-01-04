@@ -78,10 +78,10 @@ func (h *Handler) Render(c *gin.Context) {
 	}
 
 	// 验证 format
-	if req.Format != "png" && req.Format != "jpeg" && req.Format != "jpg" {
+	if req.Format != "" && req.Format != "png" {
 		c.JSON(http.StatusBadRequest, RenderResponse{
 			Success: false,
-			Message: "不支持的格式，仅支持 png, jpeg",
+			Message: "不支持的格式，仅支持 png",
 		})
 		return
 	}
@@ -128,15 +128,10 @@ func (h *Handler) Render(c *gin.Context) {
 
 // writeImage 写入图片响应
 func (h *Handler) writeImage(c *gin.Context, data []byte, format string) {
-	contentType := "image/png"
-	if format == "jpeg" || format == "jpg" {
-		contentType = "image/jpeg"
-	}
-
-	c.Writer.Header().Set("Content-Type", contentType)
+	c.Writer.Header().Set("Content-Type", "image/png")
 	c.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	c.Writer.Header().Set("Cache-Control", "public, max-age=31536000")
-	c.Data(http.StatusOK, contentType, data)
+	c.Data(http.StatusOK, "image/png", data)
 }
 
 // Health 健康检查

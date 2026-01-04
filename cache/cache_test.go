@@ -13,11 +13,11 @@ func TestGenerateCacheKey(t *testing.T) {
 		name   string
 		latex1 string
 		format1 string
-		scale1  float64
+		scale1  string
 		color1  string
 		latex2  string
 		format2 string
-		scale2  float64
+		scale2  string
 		color2  string
 		want   bool // 是否期望相同 key
 	}{
@@ -25,11 +25,11 @@ func TestGenerateCacheKey(t *testing.T) {
 			name:   "same formula produces same key",
 			latex1: "\\frac{a}{b}",
 			format1: "png",
-			scale1:  2.0,
+			scale1:  "2",
 			color1:  "black",
 			latex2:  "\\frac{a}{b}",
 			format2: "png",
-			scale2:  2.0,
+			scale2:  "2",
 			color2:  "black",
 			want:    true,
 		},
@@ -37,11 +37,11 @@ func TestGenerateCacheKey(t *testing.T) {
 			name:   "different formula produces different key",
 			latex1: "\\frac{a}{b}",
 			format1: "png",
-			scale1:  2.0,
+			scale1:  "2",
 			color1:  "black",
 			latex2:  "\\frac{c}{d}",
 			format2: "png",
-			scale2:  2.0,
+			scale2:  "2",
 			color2:  "black",
 			want:    false,
 		},
@@ -49,11 +49,23 @@ func TestGenerateCacheKey(t *testing.T) {
 			name:   "different format produces different key",
 			latex1: "\\frac{a}{b}",
 			format1: "png",
-			scale1:  2.0,
+			scale1:  "2",
 			color1:  "black",
 			latex2:  "\\frac{a}{b}",
-			format2: "svg",
-			scale2:  2.0,
+			format2: "jpeg",
+			scale2:  "2",
+			color2:  "black",
+			want:    false,
+		},
+		{
+			name:   "different scale produces different key",
+			latex1: "\\frac{a}{b}",
+			format1: "png",
+			scale1:  "2",
+			color1:  "black",
+			latex2:  "\\frac{a}{b}",
+			format2: "png",
+			scale2:  "4",
 			color2:  "black",
 			want:    false,
 		},
@@ -61,11 +73,11 @@ func TestGenerateCacheKey(t *testing.T) {
 			name:   "different color produces different key",
 			latex1: "\\frac{a}{b}",
 			format1: "png",
-			scale1:  2.0,
+			scale1:  "2",
 			color1:  "black",
 			latex2:  "\\frac{a}{b}",
 			format2: "png",
-			scale2:  2.0,
+			scale2:  "2",
 			color2:  "red",
 			want:    false,
 		},
@@ -73,8 +85,9 @@ func TestGenerateCacheKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key1 := GenerateCacheKey(tt.latex1, tt.format1, tt.scale1, tt.color1)
-			key2 := GenerateCacheKey(tt.latex2, tt.format2, tt.scale2, tt.color2)
+			// 使用默认的背景、字体大小和内边距
+			key1 := GenerateCacheKey(tt.latex1, tt.format1, tt.scale1, tt.color1, "transparent", "16", "20")
+			key2 := GenerateCacheKey(tt.latex2, tt.format2, tt.scale2, tt.color2, "transparent", "16", "20")
 
 			if tt.want {
 				if key1 != key2 {

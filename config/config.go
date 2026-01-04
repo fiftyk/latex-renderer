@@ -73,7 +73,9 @@ func LoadFromEnv() (*Config, error) {
 
 	// 从环境变量读取
 	if v := os.Getenv("SERVER_PORT"); v != "" {
-		fmt.Sscanf(v, "%d", &cfg.Server.Port)
+		if _, err := fmt.Sscanf(v, "%d", &cfg.Server.Port); err != nil {
+			// 解析失败，保持默认值
+		}
 	}
 	if v := os.Getenv("SERVER_HOST"); v != "" {
 		cfg.Server.Host = v
