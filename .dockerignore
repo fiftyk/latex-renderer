@@ -1,6 +1,14 @@
-cache/
+# 排除缓存数据文件（但保留 .go 源代码）
+cache/*.png
+cache/*.jpg
+cache/*.svg
+# 排除二进制文件
 latex-renderer
+# 排除 Git 目录
 .git
+# 排除文档
 *.md
+# 排除日志
 *.log
+# 排除 macOS 文件
 .DS_Store

@@ -4,7 +4,7 @@
 ARG DOCKER_REGISTRY=docker.io
 
 # 构建阶段
-FROM ${DOCKER_REGISTRY}/golang:1.21-alpine AS builder
+FROM ${DOCKER_REGISTRY}/golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -19,10 +19,14 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o latex-renderer .
 
 # 运行阶段
-FROM ${DOCKER_REGISTRY}/chrome:latest
+FROM browserless/chrome:latest
 
-# 安装中文字体支持（可选）
+# 切换到 root 用户进行安装
+USER root
+
+# 安装 wget（用于健康检查）和中文字体支持
 RUN apt-get update && apt-get install -y \
+    wget \
     fonts-wqy-microhei \
     fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
@@ -30,8 +34,14 @@ RUN apt-get update && apt-get install -y \
 # 复制构建好的应用
 COPY --from=builder /app/latex-renderer /usr/local/bin/
 
+# 创建缓存目录
+RUN mkdir -p /app/cache && chmod 777 /app/cache
+
 # 设置环境变量
 ENV CHROME_ARGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
+
+# 切换回非 root 用户（安全最佳实践）
+USER blessuser
 
 # 默认命令
 CMD ["latex-renderer"]
