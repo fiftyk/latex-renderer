@@ -8,6 +8,10 @@ FROM ${DOCKER_REGISTRY}/golang:1.24-alpine AS builder
 
 WORKDIR /app
 
+# 配置 Go 代理（国内镜像加速）
+ENV GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct \
+    GOSUMDB=off
+
 # 安装依赖
 COPY go.mod go.sum ./
 RUN go mod download
