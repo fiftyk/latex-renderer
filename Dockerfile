@@ -1,7 +1,8 @@
 # 构建参数：镜像仓库地址
 # 使用示例：
-#   docker build --build-arg DOCKER_REGISTRY=registry.docker-cn.com -t latex-renderer .
+#   docker build --build-arg DOCKER_REGISTRY=registry.cn-hangzhou.aliyuncs.com -t latex-renderer .
 ARG DOCKER_REGISTRY=docker.io
+ARG CHROME_IMAGE=browserless/chrome:latest
 
 # 构建阶段
 FROM ${DOCKER_REGISTRY}/golang:1.24-alpine AS builder
@@ -23,7 +24,9 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o latex-renderer .
 
 # 运行阶段
-FROM browserless/chrome:latest
+# 重新声明 ARG（多阶段构建需要在每个阶段声明）
+ARG CHROME_IMAGE=browserless/chrome:latest
+FROM ${CHROME_IMAGE}
 
 # 切换到 root 用户进行安装
 USER root
