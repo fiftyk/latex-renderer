@@ -9,9 +9,11 @@ FROM ${DOCKER_REGISTRY}/golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# 配置 Go 代理（国内镜像加速）
+# 配置 Go 代理（国内镜像加速）和内存限制
 ENV GOPROXY=https://goproxy.cn,https://mirrors.aliyun.com/goproxy/,direct \
-    GOSUMDB=off
+    GOSUMDB=off \
+    GOGC=20 \
+    GOMEMLIMIT=256MiB
 
 # 安装依赖
 COPY go.mod go.sum ./
@@ -20,8 +22,8 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用（限制并行编译数避免 OOM）
-RUN CGO_ENABLED=0 GOOS=linux go build -p 2 -a -installsuffix cgo -o latex-renderer .
+# 构建应用（完全串行编译避免 OOM，限制内存使用）
+RUN CGO_ENABLED=0 GOOS=linux go build -p 1 -a -installsuffix cgo -o latex-renderer .
 
 # 运行阶段
 # 重新声明 ARG（多阶段构建需要在每个阶段声明）
