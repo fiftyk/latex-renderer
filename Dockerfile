@@ -20,8 +20,8 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o latex-renderer .
+# 构建应用（限制并行编译数避免 OOM）
+RUN CGO_ENABLED=0 GOOS=linux go build -p 2 -a -installsuffix cgo -o latex-renderer .
 
 # 运行阶段
 # 重新声明 ARG（多阶段构建需要在每个阶段声明）
