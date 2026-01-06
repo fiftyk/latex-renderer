@@ -79,6 +79,17 @@ go mod tidy
 ### Docker 部署
 
 ```bash
+# 使用 Docker Hub 镜像
+docker run -d --name latex-renderer \
+  -p 8080:8080 \
+  --security-opt seccomp=unconfined \
+  -v /path/to/logs:/app/logs \
+  fiftyk/latex-renderer:latest
+```
+
+**或使用本地构建的镜像**:
+
+```bash
 # 构建镜像
 docker build -t latex-renderer .
 
@@ -89,6 +100,10 @@ docker run -d --name latex-renderer \
   -v /path/to/logs:/app/logs \
   latex-renderer:latest
 ```
+
+**镜像信息**:
+- Docker Hub: [fiftyk/latex-renderer](https://hub.docker.com/r/fiftyk/latex-renderer)
+- 基于 [browserless/chrome](https://github.com/browserless/chrome) 镜像
 
 **注意**: `--security-opt seccomp=unconfined` 是因为容器内 Chrome 需要沙箱配置。
 
