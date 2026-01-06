@@ -2,7 +2,6 @@
 # 使用示例：
 #   docker build --build-arg DOCKER_REGISTRY=registry.cn-hangzhou.aliyuncs.com -t latex-renderer .
 ARG DOCKER_REGISTRY=docker.io
-ARG CHROME_IMAGE=browserless/chrome:latest
 
 # 构建阶段
 FROM ${DOCKER_REGISTRY}/golang:1.24-alpine AS builder
@@ -26,9 +25,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -p 1 -a -installsuffix cgo -o latex-renderer .
 
 # 运行阶段
-# 重新声明 ARG（多阶段构建需要在每个阶段声明）
-ARG CHROME_IMAGE=browserless/chrome:latest
-FROM ${CHROME_IMAGE}
+FROM ${DOCKER_REGISTRY}/browserless/chrome:latest
 
 # 切换到 root 用户进行安装
 USER root
@@ -42,6 +39,9 @@ RUN apt-get update && apt-get install -y \
 
 # 复制构建好的应用
 COPY --from=builder /app/latex-renderer /usr/local/bin/
+
+# 复制 KaTeX 静态文件
+COPY --from=builder /app/static /app/static
 
 # 创建缓存和日志目录
 RUN mkdir -p /app/cache /app/logs && chmod 777 /app/cache /app/logs

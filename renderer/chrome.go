@@ -10,8 +10,6 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/cdproto/emulation"
-
-	"github.com/ruxuwu/latex-renderer/katex"
 )
 
 // Renderer LaTeX 渲染器 (复用 Chrome browser 实例)
@@ -138,8 +136,9 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 <html>
 <head>
   <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <style>
-    %s
     body {
       margin: 0;
       padding: 0;
@@ -163,7 +162,6 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
     <div id="formula"></div>
   </div>
   <script>
-    %s
     katex.render(%q, document.getElementById('formula'), {
       displayMode: true,
       throwOnError: false,
@@ -171,7 +169,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
     });
   </script>
 </body>
-</html>`, katex.CSS, background, padding, fontSize, color, katex.JS, opts.Latex)
+</html>`, background, padding, fontSize, color, opts.Latex)
 
 	// 使用复用的 allocator context 创建新 browser context（tab）
 	browserCtx, cancel := chromedp.NewContext(r.allocCtx)
@@ -188,6 +186,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 		emulation.SetDeviceMetricsOverride(1920, 1080, 1.0, false),
 		chromedp.Navigate(`data:text/html,`+html),
 		chromedp.WaitVisible(`#wrapper`, chromedp.ByQuery),
+		chromedp.WaitVisible(`.katex`, chromedp.ByQuery),
 		chromedp.Screenshot(`#wrapper`, &buf, chromedp.ByQuery),
 	)
 
