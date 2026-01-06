@@ -10,6 +10,8 @@ import (
 
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/cdproto/emulation"
+
+	"github.com/ruxuwu/latex-renderer/katex"
 )
 
 // Renderer LaTeX 渲染器 (复用 Chrome browser 实例)
@@ -131,14 +133,13 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 		padding = "20"
 	}
 
-	// 生成 HTML（padding 应用到 wrapper 容器，截图整个 wrapper）
+	// 生成 HTML（使用内嵌的 KaTeX 资源，无需网络访问）
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
   <style>
+    %s
     body {
       margin: 0;
       padding: 0;
@@ -162,6 +163,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
     <div id="formula"></div>
   </div>
   <script>
+    %s
     katex.render(%q, document.getElementById('formula'), {
       displayMode: true,
       throwOnError: false,
@@ -169,7 +171,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
     });
   </script>
 </body>
-</html>`, background, padding, fontSize, color, opts.Latex)
+</html>`, katex.CSS, background, padding, fontSize, color, katex.JS, opts.Latex)
 
 	// 使用复用的 allocator context 创建新 browser context（tab）
 	browserCtx, cancel := chromedp.NewContext(r.allocCtx)
