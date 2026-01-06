@@ -16,6 +16,7 @@ type Config struct {
 	Server ServerConfig    `mapstructure:"server"`
 	Cache  cacheConfig     `mapstructure:"cache"`
 	Chrome ChromeConfig    `mapstructure:"chrome"`
+	Log    LogConfig       `mapstructure:"log"`
 }
 
 // ServerConfig 服务器配置
@@ -28,6 +29,14 @@ type ServerConfig struct {
 type ChromeConfig struct {
 	ExecutablePath string `mapstructure:"executable_path"`
 	Args           string `mapstructure:"args"`
+}
+
+// LogConfig 日志配置
+type LogConfig struct {
+	Path     string `mapstructure:"path"`      // 日志文件路径，空则输出到 stdout
+	MaxSize  int    `mapstructure:"max_size"`  // 单个日志文件最大尺寸 MB，默认 100
+	MaxFiles int    `mapstructure:"max_files"` // 保留的日志文件数量，默认 3
+	Level    string `mapstructure:"level"`     // 日志级别: debug, info, warn, error
 }
 
 // cacheConfig 缓存配置
@@ -132,6 +141,14 @@ func LoadFromEnv() (*Config, error) {
 		cfg.Chrome.Args = v
 	}
 
+	// 日志配置
+	if v := os.Getenv("LOG_PATH"); v != "" {
+		cfg.Log.Path = v
+	}
+	if v := os.Getenv("LOG_LEVEL"); v != "" {
+		cfg.Log.Level = v
+	}
+
 	return cfg, nil
 }
 
@@ -155,6 +172,11 @@ func Default() *Config {
 		},
 		Chrome: ChromeConfig{
 			Args: "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage",
+		},
+		Log: LogConfig{
+			MaxSize:  100,
+			MaxFiles: 3,
+			Level:    "info",
 		},
 	}
 }
@@ -184,5 +206,14 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Chrome.Args == "" {
 		cfg.Chrome.Args = "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
+	}
+	if cfg.Log.MaxSize == 0 {
+		cfg.Log.MaxSize = 100
+	}
+	if cfg.Log.MaxFiles == 0 {
+		cfg.Log.MaxFiles = 3
+	}
+	if cfg.Log.Level == "" {
+		cfg.Log.Level = "info"
 	}
 }

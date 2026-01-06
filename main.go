@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/ruxuwu/latex-renderer/api"
 	"github.com/ruxuwu/latex-renderer/cache"
 	"github.com/ruxuwu/latex-renderer/config"
+	"github.com/ruxuwu/latex-renderer/logger"
 	"github.com/ruxuwu/latex-renderer/renderer"
 )
 
@@ -17,8 +17,22 @@ func main() {
 	// 加载配置
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
-		log.Fatalf("加载配置失败: %v", err)
+		fmt.Printf("加载配置失败: %v\n", err)
+		return
 	}
+
+	// 初始化日志
+	log, err := logger.New(&logger.Config{
+		Path:    cfg.Log.Path,
+		Level:   logger.Level(cfg.Log.Level),
+		MaxSize: cfg.Log.MaxSize,
+	})
+	if err != nil {
+		fmt.Printf("初始化日志失败: %v\n", err)
+		return
+	}
+
+	log.Print("启动 latex-renderer 服务...")
 
 	// 初始化缓存
 	var cacheImpl cache.Cache
@@ -68,7 +82,7 @@ func main() {
 	// 创建路由
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(gin.Logger())
+	router.Use(gin.LoggerWithWriter(log.Writer()))
 
 	// 设置 API 路由
 	api.SetupRoutes(router, handler)

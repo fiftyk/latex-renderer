@@ -43,11 +43,14 @@ RUN apt-get update && apt-get install -y \
 # 复制构建好的应用
 COPY --from=builder /app/latex-renderer /usr/local/bin/
 
-# 创建缓存目录
-RUN mkdir -p /app/cache && chmod 777 /app/cache
+# 创建缓存和日志目录
+RUN mkdir -p /app/cache /app/logs && chmod 777 /app/cache /app/logs
 
 # 设置环境变量
 ENV CHROME_ARGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
+
+# 默认日志路径
+ENV LOG_PATH=/app/logs/app.log
 
 # 切换回非 root 用户（安全最佳实践）
 USER blessuser

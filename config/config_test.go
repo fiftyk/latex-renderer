@@ -28,6 +28,16 @@ func TestDefault(t *testing.T) {
 	if cfg.Chrome.Args == "" {
 		t.Errorf("Chrome.Args should not be empty")
 	}
+	// 验证日志默认值
+	if cfg.Log.MaxSize != 100 {
+		t.Errorf("Log.MaxSize should be 100, got %d", cfg.Log.MaxSize)
+	}
+	if cfg.Log.MaxFiles != 3 {
+		t.Errorf("Log.MaxFiles should be 3, got %d", cfg.Log.MaxFiles)
+	}
+	if cfg.Log.Level != "info" {
+		t.Errorf("Log.Level should be 'info', got %s", cfg.Log.Level)
+	}
 }
 
 func TestLoadFromEnv(t *testing.T) {
@@ -111,5 +121,26 @@ func TestLoadFromEnv_ChromeConfig(t *testing.T) {
 	}
 	if cfg.Chrome.Args != "--no-sandbox" {
 		t.Errorf("Chrome.Args should be '--no-sandbox', got %s", cfg.Chrome.Args)
+	}
+}
+
+func TestLoadFromEnv_LogConfig(t *testing.T) {
+	os.Setenv("LOG_PATH", "/var/log/latex-renderer/app.log")
+	os.Setenv("LOG_LEVEL", "debug")
+	defer func() {
+		os.Unsetenv("LOG_PATH")
+		os.Unsetenv("LOG_LEVEL")
+	}()
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv 失败: %v", err)
+	}
+
+	if cfg.Log.Path != "/var/log/latex-renderer/app.log" {
+		t.Errorf("Log.Path should be '/var/log/latex-renderer/app.log', got %s", cfg.Log.Path)
+	}
+	if cfg.Log.Level != "debug" {
+		t.Errorf("Log.Level should be 'debug', got %s", cfg.Log.Level)
 	}
 }
