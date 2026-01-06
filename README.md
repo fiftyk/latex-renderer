@@ -98,16 +98,23 @@ docker run -d --name latex-renderer \
 
 ### Docker Hub
 
-```bash
-# 拉取镜像
-docker pull ruxuwu/latex-renderer:latest
+> 需要先登录 Docker Hub 并推送镜像
 
-# 运行
+```bash
+# 登录 Docker Hub
+docker login
+
+# 推送镜像（需要对应权限）
+docker tag latex-renderer:latest your-username/latex-renderer:latest
+docker push your-username/latex-renderer:latest
+
+# 拉取并运行
+docker pull your-username/latex-renderer:latest
 docker run -d --name latex-renderer \
   -p 8080:8080 \
   --security-opt seccomp=unconfined \
   -v /path/to/logs:/app/logs \
-  ruxuwu/latex-renderer:latest
+  your-username/latex-renderer:latest
 ```
 
 ## 配置
@@ -162,7 +169,7 @@ OSS_SECRET_KEY=your-secret-key \
 |------|------|
 | 首次请求 | 渲染公式并写入缓存 |
 | 后续请求 | 直接返回缓存数据 (响应 < 1ms) |
-| 缓存 Key | `md5(latex|format|fontSize|padding|color|background)` |
+| 缓存 Key | `md5(latex|format|scale|fontSize|padding)` |
 
 ## 性能数据
 
