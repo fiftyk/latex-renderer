@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/cdproto/emulation"
 )
 
-// Renderer LaTeX 渲染器 (每次请求创建新 tab)
+// Renderer LaTeX 渲染器 (复用 Chrome browser 实例)
 type Renderer struct {
-	allocOpts []chromedp.ExecAllocatorOption
+	allocOpts   []chromedp.ExecAllocatorOption
+	allocCtx    context.Context
+	allocCancel context.CancelFunc
+	browserMu   sync.RWMutex
+	initialized bool
 }
 
 // RenderOptions 渲染选项
@@ -55,8 +60,59 @@ func NewRenderer(execPath, args string) (*Renderer, error) {
 	}, nil
 }
 
-// Render 渲染 LaTeX 为图片 (每次请求创建新 browser + tab)
+// Warmup 预热 Chrome 浏览器，初始化一次后可复用
+func (r *Renderer) Warmup(ctx context.Context) error {
+	r.browserMu.Lock()
+	defer r.browserMu.Unlock()
+
+	if r.initialized {
+		return nil
+	}
+
+	// 创建 allocator context（长期存活）
+	allocCtx, cancel := chromedp.NewExecAllocator(ctx, r.allocOpts...)
+
+	r.allocCtx = allocCtx
+	r.allocCancel = cancel
+	r.initialized = true
+
+	return nil
+}
+
+// initBrowser 初始化浏览器（懒加载）
+func (r *Renderer) initBrowser(ctx context.Context) error {
+	r.browserMu.RLock()
+	if r.initialized {
+		r.browserMu.RUnlock()
+		return nil
+	}
+	r.browserMu.RUnlock()
+
+	r.browserMu.Lock()
+	defer r.browserMu.Unlock()
+
+	// 双重检查
+	if r.initialized {
+		return nil
+	}
+
+	// 创建 allocator context
+	allocCtx, cancel := chromedp.NewExecAllocator(ctx, r.allocOpts...)
+
+	r.allocCtx = allocCtx
+	r.allocCancel = cancel
+	r.initialized = true
+
+	return nil
+}
+
+// Render 渲染 LaTeX 为图片 (复用 browser 实例)
 func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, error) {
+	// 初始化浏览器（懒加载）
+	if err := r.initBrowser(ctx); err != nil {
+		return nil, err
+	}
+
 	// 设置默认值
 	color := opts.Color
 	if color == "" {
@@ -75,7 +131,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 		padding = "20"
 	}
 
-	// 生成 HTML
+	// 生成 HTML（padding 应用到 wrapper 容器，截图整个 wrapper）
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -85,12 +141,15 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
   <style>
     body {
       margin: 0;
-      padding: %spx;
+      padding: 0;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       background-color: %s;
+    }
+    .katex-wrapper {
+      padding: %spx;
     }
     .katex {
       font-size: %spx;
@@ -99,7 +158,9 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
   </style>
 </head>
 <body>
-  <div id="formula"></div>
+  <div class="katex-wrapper" id="wrapper">
+    <div id="formula"></div>
+  </div>
   <script>
     katex.render(%q, document.getElementById('formula'), {
       displayMode: true,
@@ -108,14 +169,10 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
     });
   </script>
 </body>
-</html>`, padding, background, fontSize, color, opts.Latex)
+</html>`, background, padding, fontSize, color, opts.Latex)
 
-	// 创建新的 browser + tab
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), r.allocOpts...)
-	defer cancel()
-
-	// 创建新 context 和 tab
-	browserCtx, cancel := chromedp.NewContext(allocCtx)
+	// 使用复用的 allocator context 创建新 browser context（tab）
+	browserCtx, cancel := chromedp.NewContext(r.allocCtx)
 	defer cancel()
 
 	// 设置超时
@@ -128,8 +185,8 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 	err := chromedp.Run(ctx,
 		emulation.SetDeviceMetricsOverride(1920, 1080, 1.0, false),
 		chromedp.Navigate(`data:text/html,`+html),
-		chromedp.WaitVisible(`.katex`, chromedp.ByQuery),
-		chromedp.Screenshot(`.katex`, &buf, chromedp.ByQuery),
+		chromedp.WaitVisible(`#wrapper`, chromedp.ByQuery),
+		chromedp.Screenshot(`#wrapper`, &buf, chromedp.ByQuery),
 	)
 
 	if err != nil {
@@ -146,6 +203,16 @@ func (r *Renderer) RenderToPNG(ctx context.Context, opts *RenderOptions) ([]byte
 
 // Close 关闭渲染器
 func (r *Renderer) Close() error {
+	r.browserMu.Lock()
+	defer r.browserMu.Unlock()
+
+	if r.allocCancel != nil {
+		r.allocCancel()
+		r.allocCancel = nil
+	}
+	r.allocCtx = nil
+	r.initialized = false
+
 	return nil
 }
 

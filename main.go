@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -49,6 +50,14 @@ func main() {
 		log.Fatalf("初始化渲染器失败: %v", err)
 	}
 	defer r.Close()
+
+	// 预热 Chrome 浏览器
+	log.Println("正在预热 Chrome 浏览器...")
+	if err := r.Warmup(context.Background()); err != nil {
+		log.Printf("警告: 预热 Chrome 失败: %v", err)
+	} else {
+		log.Println("Chrome 浏览器预热完成")
+	}
 
 	// 初始化处理器
 	handler := api.NewHandler(r, cacheImpl, cfg.Cache.TTL)
