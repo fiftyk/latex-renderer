@@ -26,8 +26,7 @@ GET /api?latex=<LaTeX公式>
 | `latex` | 是 | - | LaTeX 公式内容 | `latex=E=mc^2` |
 | `fontSize` | 否 | 16 | 字体大小 (px, 8-72) | `fontSize=24` |
 | `padding` | 否 | 20 | 内边距 (px, 0-200) | `padding=50` |
-| `color` | 否 | black | 字体颜色 | `color=red` |
-| `background` | 否 | transparent | 背景颜色 | `background=#ffffff` |
+| `scale` | 否 | 2 | 图片缩放比例 | `scale=2` |
 
 ### 使用示例
 
@@ -41,8 +40,8 @@ curl "http://localhost:8080/api?latex=E=mc^2&fontSize=24" -o large.png
 # 大内边距
 curl "http://localhost:8080/api?latex=\int_{0}^{\infty}&padding=50" -o padded.png
 
-# 自定义颜色
-curl "http://localhost:8080/api?latex=x^2&color=blue&background=#f0f0f0" -o styled.png
+# 高清图片（2倍缩放）
+curl "http://localhost:8080/api?latex=x^2&scale=2" -o hd.png
 ```
 
 ### 其他接口
@@ -116,6 +115,8 @@ docker run -d --name latex-renderer \
 | `CHROME_ARGS` | 否 | - | Chrome 额外启动参数 |
 | `LOG_PATH` | 否 | - | 日志文件路径，留空则输出到 stdout |
 | `LOG_LEVEL` | 否 | info | 日志级别 (debug/info/warn/error) |
+| `LOG_MAX_SIZE` | 否 | 100 | 单个日志文件最大尺寸 (MB) |
+| `LOG_MAX_FILES` | 否 | 3 | 保留的日志文件数量 |
 
 ### 日志配置示例
 
