@@ -12,59 +12,59 @@ func TestGenerateCacheKey(t *testing.T) {
 	tests := []struct {
 		name    string
 		latex1  string
-		scale1  string
 		font1   string
+		padding1 string
 		latex2  string
-		scale2  string
 		font2   string
+		padding2 string
 		want    bool
 	}{
 		{
-			name:   "same formula produces same key",
-			latex1: "\\frac{a}{b}",
-			scale1: "2",
-			font1:  "16",
-			latex2: "\\frac{a}{b}",
-			scale2: "2",
-			font2:  "16",
-			want:   true,
+			name:     "same formula produces same key",
+			latex1:   "\\frac{a}{b}",
+			font1:    "16",
+			padding1: "20",
+			latex2:   "\\frac{a}{b}",
+			font2:    "16",
+			padding2: "20",
+			want:     true,
 		},
 		{
-			name:   "different formula produces different key",
-			latex1: "\\frac{a}{b}",
-			scale1: "2",
-			font1:  "16",
-			latex2: "\\frac{c}{d}",
-			scale2: "2",
-			font2:  "16",
-			want:   false,
+			name:     "different formula produces different key",
+			latex1:   "\\frac{a}{b}",
+			font1:    "16",
+			padding1: "20",
+			latex2:   "\\frac{c}{d}",
+			font2:    "16",
+			padding2: "20",
+			want:     false,
 		},
 		{
-			name:   "different scale produces different key",
-			latex1: "\\frac{a}{b}",
-			scale1: "2",
-			font1:  "16",
-			latex2: "\\frac{a}{b}",
-			scale2: "4",
-			font2:  "16",
-			want:   false,
+			name:     "different fontSize produces different key",
+			latex1:   "\\frac{a}{b}",
+			font1:    "16",
+			padding1: "20",
+			latex2:   "\\frac{a}{b}",
+			font2:    "24",
+			padding2: "20",
+			want:     false,
 		},
 		{
-			name:   "different fontSize produces different key",
-			latex1: "\\frac{a}{b}",
-			scale1: "2",
-			font1:  "16",
-			latex2: "\\frac{a}{b}",
-			scale2: "2",
-			font2:  "24",
-			want:   false,
+			name:     "different padding produces different key",
+			latex1:   "\\frac{a}{b}",
+			font1:    "16",
+			padding1: "20",
+			latex2:   "\\frac{a}{b}",
+			font2:    "16",
+			padding2: "50",
+			want:     false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key1 := GenerateCacheKey(tt.latex1, "png", tt.scale1, tt.font1, "20")
-			key2 := GenerateCacheKey(tt.latex2, "png", tt.scale2, tt.font2, "20")
+			key1 := GenerateCacheKey(tt.latex1, "png", tt.font1, tt.padding1)
+			key2 := GenerateCacheKey(tt.latex2, "png", tt.font2, tt.padding2)
 
 			if tt.want {
 				if key1 != key2 {
@@ -92,7 +92,7 @@ func TestLocalCache_SetAndGet(t *testing.T) {
 		TTL: 10 * time.Minute,
 	}
 
-	cache, err := NewLocalCache(cfg)
+	cache, err := NewLocalCache(&cfg)
 	if err != nil {
 		t.Fatalf("创建缓存失败: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestLocalCache_Exists(t *testing.T) {
 		TTL: 10 * time.Minute,
 	}
 
-	cache, err := NewLocalCache(cfg)
+	cache, err := NewLocalCache(&cfg)
 	if err != nil {
 		t.Fatalf("创建缓存失败: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestLocalCache_Delete(t *testing.T) {
 		TTL: 10 * time.Minute,
 	}
 
-	cache, err := NewLocalCache(cfg)
+	cache, err := NewLocalCache(&cfg)
 	if err != nil {
 		t.Fatalf("创建缓存失败: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestLocalCache_GetNonExistent(t *testing.T) {
 		TTL: 10 * time.Minute,
 	}
 
-	cache, err := NewLocalCache(cfg)
+	cache, err := NewLocalCache(&cfg)
 	if err != nil {
 		t.Fatalf("创建缓存失败: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestLocalCache_Name(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "latex-cache-test")
 	defer os.RemoveAll(tmpDir)
 
-	cache, _ := NewLocalCache(LocalConfig{Dir: tmpDir})
+	cache, _ := NewLocalCache(&LocalConfig{Dir: tmpDir})
 
 	if cache.Name() != "local" {
 		t.Errorf("Name() should return 'local', got %s", cache.Name())
@@ -253,7 +253,7 @@ func TestLocalCache_TTLExpired(t *testing.T) {
 		TTL: 1 * time.Millisecond, // 设置很短的 TTL
 	}
 
-	cache, err := NewLocalCache(cfg)
+	cache, err := NewLocalCache(&cfg)
 	if err != nil {
 		t.Fatalf("创建缓存失败: %v", err)
 	}

@@ -24,9 +24,9 @@ GET /api?latex=<LaTeX公式>
 | 参数 | 必填 | 默认值 | 说明 | 示例 |
 |------|------|--------|------|------|
 | `latex` | 是 | - | LaTeX 公式内容 | `latex=E=mc^2` |
+| `format` | 否 | png | 输出格式 (仅支持 png) | `format=png` |
 | `fontSize` | 否 | 16 | 字体大小 (px, 8-72) | `fontSize=24` |
 | `padding` | 否 | 20 | 内边距 (px, 0-200) | `padding=50` |
-| `scale` | 否 | 2 | 图片缩放比例 | `scale=2` |
 
 ### 使用示例
 
@@ -39,9 +39,6 @@ curl "http://localhost:8080/api?latex=E=mc^2&fontSize=24" -o large.png
 
 # 大内边距
 curl "http://localhost:8080/api?latex=\int_{0}^{\infty}&padding=50" -o padded.png
-
-# 高清图片（2倍缩放）
-curl "http://localhost:8080/api?latex=x^2&scale=2" -o hd.png
 ```
 
 ### 其他接口
@@ -106,11 +103,13 @@ docker run -d --name latex-renderer \
 | `CACHE_TYPE` | 否 | local | 缓存类型 (local/oss) |
 | `CACHE_LOCAL_DIR` | 否 | ./cache | 本地缓存目录 |
 | `CACHE_TTL` | 否 | 168h | 缓存过期时间 |
+| `CACHE_LOCAL_TTL` | 否 | 168h | 本地缓存过期时间 |
 | `OSS_ENDPOINT` | 当 type=oss 时 | - | OSS endpoint |
 | `OSS_BUCKET` | 当 type=oss 时 | - | OSS bucket 名称 |
 | `OSS_ACCESS_KEY` | 当 type=oss 时 | - | OSS access key |
 | `OSS_SECRET_KEY` | 当 type=oss 时 | - | OSS secret key |
 | `OSS_DOMAIN` | 否 | - | OSS 自定义域名 |
+| `OSS_TTL` | 否 | 168h | OSS 缓存过期时间 |
 | `CHROME_EXECUTABLE_PATH` | 否 | 自动查找 | Chrome 可执行文件路径 |
 | `CHROME_ARGS` | 否 | - | Chrome 额外启动参数 |
 | `LOG_PATH` | 否 | - | 日志文件路径，留空则输出到 stdout |
@@ -149,7 +148,7 @@ OSS_SECRET_KEY=your-secret-key \
 |------|------|
 | 首次请求 | 渲染公式并写入缓存 |
 | 后续请求 | 直接返回缓存数据 (响应 < 1ms) |
-| 缓存 Key | `md5(latex|format|scale|fontSize|padding)` |
+| 缓存 Key | `md5(latex|format|fontSize|padding)` |
 
 ## 性能数据
 

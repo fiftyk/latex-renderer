@@ -10,6 +10,15 @@ import (
 	"github.com/ruxuwu/latex-renderer/renderer"
 )
 
+// RendererInterface 渲染器接口
+type RendererInterface interface {
+	RenderToPNG(ctx context.Context, opts *renderer.RenderOptions) ([]byte, error)
+	Close() error
+}
+
+// Ensure *renderer.Renderer implements RendererInterface
+var _ RendererInterface = (*renderer.Renderer)(nil)
+
 // Config 渲染配置
 type Config struct {
 	ChromePath string        // Chrome 可执行文件路径
@@ -33,7 +42,7 @@ type Result struct {
 
 // Client LaTeX 渲染客户端
 type Client struct {
-	renderer *renderer.Renderer
+	renderer RendererInterface
 	cache    cache.Cache
 	ttl      time.Duration
 }
@@ -93,7 +102,7 @@ func (c *Client) Render(ctx context.Context, latex string, opts ...Option) ([]by
 	}
 
 	// 生成缓存 key
-	cacheKey := cache.GenerateCacheKey(latex, "png", "1", o.fontSize, o.padding)
+	cacheKey := cache.GenerateCacheKey(latex, "png", o.fontSize, o.padding)
 
 	// 尝试从缓存获取
 	data, err := c.cache.Get(ctx, cacheKey)

@@ -31,7 +31,6 @@ func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration) *Handler
 type RenderRequest struct {
 	Latex    string `form:"latex" binding:"required"`
 	Format   string `form:"format"`
-	Scale    string `form:"scale"`
 	FontSize string `form:"fontSize"`
 	Padding  string `form:"padding"`
 }
@@ -59,9 +58,6 @@ func (h *Handler) Render(c *gin.Context) {
 	if req.Format == "" {
 		req.Format = "png"
 	}
-	if req.Scale == "" {
-		req.Scale = "2"
-	}
 	if req.FontSize == "" {
 		req.FontSize = "16"
 	}
@@ -79,7 +75,7 @@ func (h *Handler) Render(c *gin.Context) {
 	}
 
 	// 生成缓存 key
-	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.Scale, req.FontSize, req.Padding)
+	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.FontSize, req.Padding)
 
 	// 尝试从缓存获取
 	data, err := h.cache.Get(c.Request.Context(), cacheKey)
