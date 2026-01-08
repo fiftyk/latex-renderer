@@ -19,6 +19,10 @@ type Renderer struct {
 	allocCancel context.CancelFunc
 	browserMu   sync.RWMutex
 	initialized bool
+	requestCount int64          // 请求计数，用于定期重启
+	maxRequests  int64          // 最大请求数后重启浏览器
+	lastRestart  time.Time      // 上次重启时间
+	maxInterval  time.Duration  // 最大间隔时间
 }
 
 // RenderOptions 渲染选项
@@ -60,7 +64,10 @@ func NewRenderer(execPath, args string) (*Renderer, error) {
 	}
 
 	return &Renderer{
-		allocOpts: opts,
+		allocOpts:   opts,
+		maxRequests: 100,      // 每100个请求重启一次
+		maxInterval: 10 * time.Minute,  // 或每10分钟重启一次
+		lastRestart: time.Now(),
 	}, nil
 }
 
@@ -110,12 +117,65 @@ func (r *Renderer) initBrowser(ctx context.Context) error {
 	return nil
 }
 
+// shouldRestart 检查是否需要重启浏览器
+func (r *Renderer) shouldRestart() bool {
+	r.browserMu.Lock()
+	defer r.browserMu.Unlock()
+
+	if !r.initialized {
+		return false
+	}
+
+	// 检查请求数
+	if r.requestCount >= r.maxRequests {
+		return true
+	}
+
+	// 检查时间间隔
+	if time.Since(r.lastRestart) >= r.maxInterval {
+		return true
+	}
+
+	return false
+}
+
+// restartBrowser 重启浏览器
+func (r *Renderer) restartBrowser(ctx context.Context) error {
+	r.browserMu.Lock()
+	defer r.browserMu.Unlock()
+
+	if r.allocCancel != nil {
+		r.allocCancel()
+	}
+
+	// 创建新的 allocator context
+	allocCtx, cancel := chromedp.NewExecAllocator(ctx, r.allocOpts...)
+	r.allocCtx = allocCtx
+	r.allocCancel = cancel
+	r.requestCount = 0
+	r.lastRestart = time.Now()
+
+	return nil
+}
+
 // Render 渲染 LaTeX 为图片 (复用 browser 实例)
 func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, error) {
+	// 检查是否需要重启浏览器
+	if r.shouldRestart() {
+		if err := r.restartBrowser(ctx); err != nil {
+			return nil, fmt.Errorf("重启浏览器失败: %w", err)
+		}
+	}
+
 	// 初始化浏览器（懒加载）
 	if err := r.initBrowser(ctx); err != nil {
 		return nil, err
 	}
+
+	// 增加请求计数
+	r.browserMu.Lock()
+	r.requestCount++
+	r.browserMu.Unlock()
 
 	// 设置默认值
 	color := opts.Color
