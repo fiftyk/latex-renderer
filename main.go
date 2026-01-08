@@ -58,8 +58,16 @@ func main() {
 		log.Println("警告: 未找到 Chrome，尝试使用系统默认")
 	}
 
+	// 创建并发限制策略（默认 2 个并发）
+	maxConcurrent := cfg.MaxConcurrent
+	if maxConcurrent <= 0 {
+		maxConcurrent = 2
+	}
+	log.Printf("最大并发数: %d", maxConcurrent)
+	overloadStrategy := renderer.NewFailFastStrategy(maxConcurrent)
+
 	// 初始化渲染器
-	r, err := renderer.NewRenderer(cfg.Chrome.ExecutablePath, cfg.Chrome.Args)
+	r, err := renderer.NewRenderer(cfg.Chrome.ExecutablePath, cfg.Chrome.Args, maxConcurrent)
 	if err != nil {
 		log.Fatalf("初始化渲染器失败: %v", err)
 	}
@@ -74,7 +82,7 @@ func main() {
 	}
 
 	// 初始化处理器
-	handler := api.NewHandler(r, cacheImpl, cfg.Cache.TTL)
+	handler := api.NewHandler(r, cacheImpl, cfg.Cache.TTL, overloadStrategy)
 
 	// 设置 Gin 模式
 	gin.SetMode(gin.ReleaseMode)

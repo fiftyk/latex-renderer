@@ -13,10 +13,11 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server ServerConfig    `mapstructure:"server"`
-	Cache  cacheConfig     `mapstructure:"cache"`
-	Chrome ChromeConfig    `mapstructure:"chrome"`
-	Log    LogConfig       `mapstructure:"log"`
+	Server        ServerConfig    `mapstructure:"server"`
+	Cache         cacheConfig     `mapstructure:"cache"`
+	Chrome        ChromeConfig    `mapstructure:"chrome"`
+	Log           LogConfig       `mapstructure:"log"`
+	MaxConcurrent int             `mapstructure:"max_concurrent"` // 最大并发数
 }
 
 // ServerConfig 服务器配置
@@ -149,6 +150,14 @@ func LoadFromEnv() (*Config, error) {
 		cfg.Log.Level = v
 	}
 
+	// 并发配置
+	if v := os.Getenv("MAX_CONCURRENT"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+			cfg.MaxConcurrent = n
+		}
+	}
+
 	return cfg, nil
 }
 
@@ -178,6 +187,7 @@ func Default() *Config {
 			MaxFiles: 3,
 			Level:    "info",
 		},
+		MaxConcurrent: 2, // 默认最多 2 个并发
 	}
 }
 
@@ -215,5 +225,8 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"
+	}
+	if cfg.MaxConcurrent <= 0 {
+		cfg.MaxConcurrent = 2
 	}
 }

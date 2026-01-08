@@ -12,17 +12,60 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 )
 
+// OverloadStrategy 并发满时的处理策略接口
+type OverloadStrategy interface {
+	// Handle 尝试获取信号量，返回 true 表示获取成功
+	Handle() bool
+	// Release 释放信号量
+	Release()
+	// Reject 返回被拒绝时的错误
+	Reject() error
+}
+
+// FailFastStrategy 快速失败策略：并发满时立即返回错误
+type FailFastStrategy struct {
+	sem chan struct{}
+}
+
+// NewFailFastStrategy 创建快速失败策略
+func NewFailFastStrategy(limit int) OverloadStrategy {
+	return &FailFastStrategy{
+		sem: make(chan struct{}, limit),
+	}
+}
+
+func (s *FailFastStrategy) Handle() bool {
+	select {
+	case s.sem <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *FailFastStrategy) Reject() error {
+	return fmt.Errorf("服务繁忙，请稍后再试")
+}
+
+func (s *FailFastStrategy) Release() {
+	select {
+	case <-s.sem:
+	default:
+	}
+}
+
 // Renderer LaTeX 渲染器 (复用 Chrome browser 实例)
 type Renderer struct {
-	allocOpts   []chromedp.ExecAllocatorOption
-	allocCtx    context.Context
-	allocCancel context.CancelFunc
-	browserMu   sync.RWMutex
-	initialized bool
-	requestCount int64          // 请求计数，用于定期重启
-	maxRequests  int64          // 最大请求数后重启浏览器
-	lastRestart  time.Time      // 上次重启时间
-	maxInterval  time.Duration  // 最大间隔时间
+	allocOpts        []chromedp.ExecAllocatorOption
+	allocCtx         context.Context
+	allocCancel      context.CancelFunc
+	browserMu        sync.RWMutex
+	initialized      bool
+	requestCount     int64          // 请求计数，用于定期重启
+	maxRequests      int64          // 最大请求数后重启浏览器
+	lastRestart      time.Time      // 上次重启时间
+	maxInterval      time.Duration  // 最大间隔时间
+	overloadStrategy OverloadStrategy
 }
 
 // RenderOptions 渲染选项
@@ -35,7 +78,7 @@ type RenderOptions struct {
 }
 
 // NewRenderer 创建渲染器
-func NewRenderer(execPath, args string) (*Renderer, error) {
+func NewRenderer(execPath, args string, maxConcurrent int) (*Renderer, error) {
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
@@ -63,11 +106,17 @@ func NewRenderer(execPath, args string) (*Renderer, error) {
 		opts = append(opts, chromedp.ExecPath(execPath))
 	}
 
+	// 默认并发数为 2
+	if maxConcurrent <= 0 {
+		maxConcurrent = 2
+	}
+
 	return &Renderer{
-		allocOpts:   opts,
-		maxRequests: 100,      // 每100个请求重启一次
-		maxInterval: 10 * time.Minute,  // 或每10分钟重启一次
-		lastRestart: time.Now(),
+		allocOpts:        opts,
+		maxRequests:      100,      // 每100个请求重启一次
+		maxInterval:      10 * time.Minute,  // 或每10分钟重启一次
+		lastRestart:      time.Now(),
+		overloadStrategy: NewFailFastStrategy(maxConcurrent),
 	}, nil
 }
 
@@ -160,6 +209,8 @@ func (r *Renderer) restartBrowser(ctx context.Context) error {
 
 // Render 渲染 LaTeX 为图片 (复用 browser 实例)
 func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, error) {
+	// 注意：并发限制由 Handler 层统一检查，这里不再检查
+
 	// 检查是否需要重启浏览器
 	if r.shouldRestart() {
 		if err := r.restartBrowser(ctx); err != nil {

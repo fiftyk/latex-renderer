@@ -13,17 +13,19 @@ import (
 
 // Handler HTTP 处理器
 type Handler struct {
-	renderer *renderer.Renderer
-	cache    cache.Cache
-	ttl      time.Duration
+	renderer         *renderer.Renderer
+	cache            cache.Cache
+	ttl              time.Duration
+	overloadStrategy renderer.OverloadStrategy
 }
 
 // NewHandler 创建处理器
-func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration) *Handler {
+func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration, strategy renderer.OverloadStrategy) *Handler {
 	return &Handler{
-		renderer: r,
-		cache:    c,
-		ttl:      ttl,
+		renderer:         r,
+		cache:            c,
+		ttl:              ttl,
+		overloadStrategy: strategy,
 	}
 }
 
@@ -45,6 +47,16 @@ type RenderResponse struct {
 
 // Render 处理渲染请求
 func (h *Handler) Render(c *gin.Context) {
+	// 检查并发限制
+	if !h.overloadStrategy.Handle() {
+		c.JSON(http.StatusServiceUnavailable, RenderResponse{
+			Success: false,
+			Message: h.overloadStrategy.Reject().Error(),
+		})
+		return
+	}
+	defer h.overloadStrategy.Release()
+
 	var req RenderRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, RenderResponse{
