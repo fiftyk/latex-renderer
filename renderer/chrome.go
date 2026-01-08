@@ -3,6 +3,7 @@ package renderer
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -118,8 +119,8 @@ func NewRenderer(execPath, args string, maxConcurrent int, staticBaseURL ...stri
 
 	return &Renderer{
 		allocOpts:        opts,
-		maxRequests:      100,              // 每100个请求重启一次
-		maxInterval:      10 * time.Minute, // 或每10分钟重启一次
+		maxRequests:      10,               // 每10个请求重启一次（更频繁重启避免崩溃）
+		maxInterval:      5 * time.Minute,  // 或每5分钟重启一次（更频繁重启避免崩溃）
 		lastRestart:      time.Now(),
 		overloadStrategy: NewFailFastStrategy(maxConcurrent),
 		staticBaseURL:    baseURL,
@@ -199,9 +200,14 @@ func (r *Renderer) restartBrowser(ctx context.Context) error {
 	r.browserMu.Lock()
 	defer r.browserMu.Unlock()
 
+	// 取消旧的allocator context
 	if r.allocCancel != nil {
 		r.allocCancel()
+		r.allocCancel = nil
 	}
+
+	// 短暂延迟确保旧实例被清理
+	time.Sleep(100 * time.Millisecond)
 
 	// 创建新的 allocator context
 	allocCtx, cancel := chromedp.NewExecAllocator(ctx, r.allocOpts...)
@@ -209,6 +215,9 @@ func (r *Renderer) restartBrowser(ctx context.Context) error {
 	r.allocCancel = cancel
 	r.requestCount = 0
 	r.lastRestart = time.Now()
+
+	// 再次短暂延迟确保新实例启动
+	time.Sleep(200 * time.Millisecond)
 
 	return nil
 }
@@ -302,23 +311,53 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 	browserCtx, cancel := chromedp.NewContext(r.allocCtx)
 	defer cancel()
 
-	// 设置超时
-	ctx, cancel = context.WithTimeout(browserCtx, 60*time.Second)
+	// 设置超时 - 缩短到10秒，快速失败
+	renderCtx, cancel := context.WithTimeout(browserCtx, 10*time.Second)
 	defer cancel()
 
-	// 执行渲染
+	// 执行渲染 - 添加重试机制
 	var buf []byte
+	var err error
 
-	err := chromedp.Run(ctx,
-		emulation.SetDeviceMetricsOverride(1920, 1080, 1.0, false),
-		chromedp.Navigate(`data:text/html,`+html),
-		chromedp.WaitVisible(`#wrapper`, chromedp.ByQuery),
-		chromedp.WaitVisible(`.katex`, chromedp.ByQuery),
-		chromedp.Screenshot(`#wrapper`, &buf, chromedp.ByQuery),
-	)
+	// 最多重试2次
+	for attempt := 0; attempt < 2; attempt++ {
+		if attempt > 0 {
+			// 重试前重启浏览器
+			log.Println("渲染失败，重启浏览器...")
+			if restartErr := r.restartBrowser(ctx); restartErr != nil {
+				return nil, fmt.Errorf("重启浏览器失败: %w", restartErr)
+			}
+			// 重新初始化
+			if initErr := r.initBrowser(ctx); initErr != nil {
+				return nil, initErr
+			}
+			// 创建新的browser context
+			browserCtx, cancel = chromedp.NewContext(r.allocCtx)
+			defer cancel()
+			renderCtx, cancel = context.WithTimeout(browserCtx, 10*time.Second)
+			defer cancel()
+		}
 
-	if err != nil {
-		return nil, fmt.Errorf("渲染失败: %w", err)
+		err = chromedp.Run(renderCtx,
+			emulation.SetDeviceMetricsOverride(1920, 1080, 1.0, false),
+			chromedp.Navigate(`data:text/html,`+html),
+			chromedp.WaitVisible(`#wrapper`, chromedp.ByQuery),
+			chromedp.WaitVisible(`.katex`, chromedp.ByQuery),
+			chromedp.Screenshot(`#wrapper`, &buf, chromedp.ByQuery),
+		)
+
+		if err == nil {
+			// 成功！
+			break
+		}
+
+		// 如果是最后一次尝试，返回错误
+		if attempt == 1 {
+			return nil, fmt.Errorf("渲染失败 (尝试 %d 次): %w", attempt+1, err)
+		}
+
+		// 短暂延迟后重试
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	return buf, nil
