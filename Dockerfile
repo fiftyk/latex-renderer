@@ -24,7 +24,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o latex-renderer .
 
 # 运行阶段 - 使用 browserless/chrome（功能完整的无头 Chrome）
-FROM ${DOCKER_REGISTRY}/browserless/chrome:latest
+FROM docker.m.daocloud.io/browserless/chrome:latest
 
 # 切换到 root 用户进行安装
 USER root
