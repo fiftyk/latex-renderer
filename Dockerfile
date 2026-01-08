@@ -3,8 +3,8 @@
 #   docker build --build-arg DOCKER_REGISTRY=registry.cn-hangzhou.aliyuncs.com -t latex-renderer .
 ARG DOCKER_REGISTRY=docker.io
 
-# 构建阶段 - 使用现有镜像编译应用
-FROM ${DOCKER_REGISTRY}/crpi-vrqfzo6fw9cp7rqe.cn-wulanchabu.personal.cr.aliyuncs.com/fiftyk/latex-renderer:latest AS builder
+# 构建阶段 - 使用 Go 编译应用
+FROM golang:1.20-alpine AS builder
 
 # 安装git（go mod需要）
 RUN apk add --no-cache git
