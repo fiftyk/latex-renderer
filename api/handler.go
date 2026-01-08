@@ -17,15 +17,21 @@ type Handler struct {
 	cache            cache.Cache
 	ttl              time.Duration
 	overloadStrategy renderer.OverloadStrategy
+	staticBaseURL    string // 静态资源基础URL
 }
 
 // NewHandler 创建处理器
-func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration, strategy renderer.OverloadStrategy) *Handler {
+func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration, strategy renderer.OverloadStrategy, staticBaseURL ...string) *Handler {
+	var baseURL string
+	if len(staticBaseURL) > 0 {
+		baseURL = staticBaseURL[0]
+	}
 	return &Handler{
 		renderer:         r,
 		cache:            c,
 		ttl:              ttl,
 		overloadStrategy: strategy,
+		staticBaseURL:    baseURL,
 	}
 }
 
@@ -135,9 +141,9 @@ func (h *Handler) writeImage(c *gin.Context, data []byte) {
 // Health 健康检查
 func (h *Handler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "ok",
-		"cache":   h.cache.Name(),
-		"uptime":  time.Since(startTime).String(),
+		"status": "ok",
+		"cache":  h.cache.Name(),
+		"uptime": time.Since(startTime).String(),
 	})
 }
 

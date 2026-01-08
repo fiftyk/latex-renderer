@@ -3,6 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -66,8 +71,30 @@ func main() {
 	log.Printf("最大并发数: %d", maxConcurrent)
 	overloadStrategy := renderer.NewFailFastStrategy(maxConcurrent)
 
-	// 初始化渲染器
-	r, err := renderer.NewRenderer(cfg.Chrome.ExecutablePath, cfg.Chrome.Args, maxConcurrent)
+	// 启动静态文件HTTP服务器（用于KaTeX资源）
+	staticServerPort := 9090
+	staticAddr := fmt.Sprintf("127.0.0.1:%d", staticServerPort)
+	staticServer := &http.Server{
+		Addr:         staticAddr,
+		Handler:      http.FileServer(http.Dir("./static")),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		log.Printf("启动静态文件服务器: %s", staticAddr)
+		if err := staticServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("启动静态文件服务器失败: %v", err)
+		}
+	}()
+
+	// 等待静态服务器启动
+	time.Sleep(500 * time.Millisecond)
+
+	staticBaseURL := fmt.Sprintf("http://%s", staticAddr)
+
+	// 初始化渲染器（传入静态资源URL）
+	r, err = renderer.NewRenderer(cfg.Chrome.ExecutablePath, cfg.Chrome.Args, maxConcurrent, staticBaseURL)
 	if err != nil {
 		log.Fatalf("初始化渲染器失败: %v", err)
 	}
@@ -82,7 +109,7 @@ func main() {
 	}
 
 	// 初始化处理器
-	handler := api.NewHandler(r, cacheImpl, cfg.Cache.TTL, overloadStrategy)
+	handler := api.NewHandler(r, cacheImpl, cfg.Cache.TTL, overloadStrategy, staticBaseURL)
 
 	// 设置 Gin 模式
 	gin.SetMode(gin.ReleaseMode)
@@ -101,7 +128,36 @@ func main() {
 	log.Printf("API: http://%s/api?latex=公式", addr)
 	log.Printf("健康检查: http://%s/health", addr)
 
-	if err := router.Run(addr); err != nil {
-		log.Fatalf("启动服务器失败: %v", err)
+	// 创建中断信号通道
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// 启动主服务器
+	serverErr := make(chan error, 1)
+	go func() {
+		log.Println("服务已启动")
+		if err := router.Run(addr); err != nil {
+			serverErr <- err
+		}
+	}()
+
+	// 等待中断或服务器错误
+	select {
+	case <-quit:
+		log.Println("正在关闭服务器...")
+	case err := <-serverErr:
+		log.Fatalf("服务器错误: %v", err)
 	}
+
+	// 优雅关闭服务器
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 关闭静态文件服务器
+	log.Println("关闭静态文件服务器...")
+	if err := staticServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("关闭静态文件服务器失败: %v", err)
+	}
+
+	log.Println("服务器已关闭")
 }

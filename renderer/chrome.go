@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chromedp/chromedp"
 	"github.com/chromedp/cdproto/emulation"
+	"github.com/chromedp/chromedp"
 )
 
 // OverloadStrategy 并发满时的处理策略接口
@@ -61,11 +61,12 @@ type Renderer struct {
 	allocCancel      context.CancelFunc
 	browserMu        sync.RWMutex
 	initialized      bool
-	requestCount     int64          // 请求计数，用于定期重启
-	maxRequests      int64          // 最大请求数后重启浏览器
-	lastRestart      time.Time      // 上次重启时间
-	maxInterval      time.Duration  // 最大间隔时间
+	requestCount     int64         // 请求计数，用于定期重启
+	maxRequests      int64         // 最大请求数后重启浏览器
+	lastRestart      time.Time     // 上次重启时间
+	maxInterval      time.Duration // 最大间隔时间
 	overloadStrategy OverloadStrategy
+	staticBaseURL    string // 静态资源基础URL
 }
 
 // RenderOptions 渲染选项
@@ -78,7 +79,11 @@ type RenderOptions struct {
 }
 
 // NewRenderer 创建渲染器
-func NewRenderer(execPath, args string, maxConcurrent int) (*Renderer, error) {
+func NewRenderer(execPath, args string, maxConcurrent int, staticBaseURL ...string) (*Renderer, error) {
+	var baseURL string
+	if len(staticBaseURL) > 0 {
+		baseURL = staticBaseURL[0]
+	}
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
@@ -113,10 +118,11 @@ func NewRenderer(execPath, args string, maxConcurrent int) (*Renderer, error) {
 
 	return &Renderer{
 		allocOpts:        opts,
-		maxRequests:      100,      // 每100个请求重启一次
-		maxInterval:      10 * time.Minute,  // 或每10分钟重启一次
+		maxRequests:      100,              // 每100个请求重启一次
+		maxInterval:      10 * time.Minute, // 或每10分钟重启一次
 		lastRestart:      time.Now(),
 		overloadStrategy: NewFailFastStrategy(maxConcurrent),
+		staticBaseURL:    baseURL,
 	}, nil
 }
 
@@ -246,13 +252,19 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 		padding = "20"
 	}
 
-	// 生成 HTML（使用内嵌的 KaTeX 资源，无需网络访问）
+	// 生成 HTML（使用HTTP服务器提供KaTeX资源）
+	cssURL := "file:///app/static/katex/katex.min.css"
+	jsURL := "file:///app/static/katex/katex.min.js"
+	if r.staticBaseURL != "" {
+		cssURL = r.staticBaseURL + "/katex/katex.min.css"
+		jsURL = r.staticBaseURL + "/katex/katex.min.js"
+	}
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <link rel="stylesheet" href="%s">
+  <script src="%s"></script>
   <style>
     body {
       margin: 0;
@@ -284,7 +296,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
     });
   </script>
 </body>
-</html>`, background, padding, fontSize, color, opts.Latex)
+</html>`, cssURL, jsURL, background, padding, fontSize, color, opts.Latex)
 
 	// 使用复用的 allocator context 创建新 browser context（tab）
 	browserCtx, cancel := chromedp.NewContext(r.allocCtx)

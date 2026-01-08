@@ -3,6 +3,26 @@
 #   docker build --build-arg DOCKER_REGISTRY=registry.cn-hangzhou.aliyuncs.com -t latex-renderer .
 ARG DOCKER_REGISTRY=docker.io
 
+# 构建阶段 - 使用 Go 编译应用
+FROM golang:1.20-alpine AS builder
+
+# 安装git（go mod需要）
+RUN apk add --no-cache git
+
+WORKDIR /app
+
+# 复制 go mod 文件
+COPY go.mod go.sum ./
+
+# 下载依赖
+RUN go mod download
+
+# 复制源代码
+COPY . .
+
+# 编译应用
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o latex-renderer .
+
 # 运行阶段 - 使用 browserless/chrome（功能完整的无头 Chrome）
 FROM ${DOCKER_REGISTRY}/browserless/chrome:latest
 
@@ -17,7 +37,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制构建好的应用
-COPY latex-renderer /usr/local/bin/
+COPY --from=builder /app/latex-renderer /usr/local/bin/
 
 # 复制 KaTeX 静态文件
 COPY static /app/static
