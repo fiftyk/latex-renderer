@@ -44,8 +44,12 @@ func NewRenderer(execPath, args string) (*Renderer, error) {
 	if args != "" {
 		for _, part := range strings.Fields(args) {
 			if strings.HasPrefix(part, "--") {
+				// 处理 --flag=value 格式
 				if kv := strings.SplitN(part, "=", 2); len(kv) == 2 {
 					opts = append(opts, chromedp.Flag(kv[0][2:], kv[1]))
+				} else {
+					// 处理 --flag 格式（无值参数如 --no-sandbox）
+					opts = append(opts, chromedp.Flag(part[2:], "true"))
 				}
 			}
 		}

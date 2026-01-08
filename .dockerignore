@@ -2,8 +2,6 @@
 cache/*.png
 cache/*.jpg
 cache/*.svg
-# 排除二进制文件
-latex-renderer
 # 排除 Git 目录
 .git
 # 排除文档
@@ -12,3 +10,5 @@ latex-renderer
 *.log
 # 排除 macOS 文件
 .DS_Store
+# 排除编译输出
+bin/

@@ -70,42 +70,52 @@ cd latex-renderer
 # 安装依赖
 go mod tidy
 
+# 编译项目（输出到 bin/ 目录）
+mkdir -p bin && go build -o bin/latex-renderer .
+
 # 运行服务
-./latex-renderer
+./bin/latex-renderer
 ```
 
 服务默认在 `http://localhost:8080` 启动。
 
-### Docker 部署
+**或使用构建脚本**:
 
 ```bash
-# 使用 Docker Hub 镜像
-docker run -d --name latex-renderer \
-  -p 8080:8080 \
-  --security-opt seccomp=unconfined \
-  -v /path/to/logs:/app/logs \
-  fiftyk/latex-renderer:latest
+# 编译并构建镜像
+./build.sh
 ```
 
-**或使用本地构建的镜像**:
+### Docker 部署
+
+**使用阿里云镜像仓库**:
 
 ```bash
-# 构建镜像
-docker build -t latex-renderer .
-
 # 运行容器
 docker run -d --name latex-renderer \
   -p 8080:8080 \
-  --security-opt seccomp=unconfined \
   -v /path/to/logs:/app/logs \
-  latex-renderer:latest
+  crpi-vrqfzo6fw9cp7rqe.cn-wulanchabu.personal.cr.aliyuncs.com/fiftyk/latex-renderer:latest
+```
+
+**本地构建**:
+
+```bash
+# 执行构建脚本（自动编译并推送到镜像仓库）
+./build.sh
+
+# 或仅本地构建测试
+docker build -t latex-renderer:local .
+docker run -d --name latex-renderer \
+  -p 8080:8080 \
+  latex-renderer:local
 ```
 
 **镜像信息**:
-- Docker Hub: [fiftyk/latex-renderer](https://hub.docker.com/r/fiftyk/latex-renderer)
+- 仓库地址: `crpi-vrqfzo6fw9cp7rqe.cn-wulanchabu.personal.cr.aliyuncs.com/fiftyk/latex-renderer`
 - 基于 [browserless/chrome](https://github.com/browserless/chrome) 镜像
 
-**注意**: `--security-opt seccomp=unconfined` 是因为容器内 Chrome 需要沙箱配置。
+**注意**: 容器内已配置 `--no-sandbox` 参数，无需额外安全选项。
 
 ## 配置
 
@@ -126,7 +136,7 @@ docker run -d --name latex-renderer \
 | `OSS_DOMAIN` | 否 | - | OSS 自定义域名 |
 | `OSS_TTL` | 否 | 168h | OSS 缓存过期时间 |
 | `CHROME_EXECUTABLE_PATH` | 否 | 自动查找 | Chrome 可执行文件路径 |
-| `CHROME_ARGS` | 否 | - | Chrome 额外启动参数 |
+| `CHROME_ARGS` | 否 | `--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage` | Chrome 启动参数 |
 | `LOG_PATH` | 否 | - | 日志文件路径，留空则输出到 stdout |
 | `LOG_LEVEL` | 否 | info | 日志级别 (debug/info/warn/error) |
 | `LOG_MAX_SIZE` | 否 | 100 | 单个日志文件最大尺寸 (MB) |
