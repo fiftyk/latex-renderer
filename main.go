@@ -43,18 +43,21 @@ func main() {
 	var cacheImpl cache.Cache
 	switch cfg.Cache.Type {
 	case "oss":
+		log.Println("正在初始化 OSS 缓存...")
 		cacheImpl, err = cache.NewOSSCache(&cfg.Cache.OSS)
 		if err != nil {
 			log.Fatalf("初始化 OSS 缓存失败: %v", err)
 		}
-		log.Printf("使用 OSS 缓存: %s", cfg.Cache.OSS.Endpoint)
+		log.Printf("✓ 使用 OSS 缓存: %s", cfg.Cache.OSS.Endpoint)
 	default:
 		// 默认使用本地缓存
+		log.Println("正在初始化本地缓存...")
 		cacheImpl, err = cache.NewLocalCache(&cfg.Cache.Local)
 		if err != nil {
 			log.Fatalf("初始化本地缓存失败: %v", err)
 		}
-		log.Printf("使用本地缓存: %s", cfg.Cache.Local.Dir)
+		log.Printf("✓ 使用本地缓存: %s", cfg.Cache.Local.Dir)
+		log.Printf("✓ 缓存 TTL: %v", cfg.Cache.TTL)
 	}
 
 	// 查找 Chrome

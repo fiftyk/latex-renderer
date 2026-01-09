@@ -1,8 +1,11 @@
 package api
 
 import (
+	"crypto/md5"
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -95,15 +98,41 @@ func (h *Handler) Render(c *gin.Context) {
 	// 生成缓存 key
 	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.FontSize, req.Padding)
 
+	log.Printf("[缓存] 尝试获取缓存: key=%s", cacheKey)
+
 	// 尝试从缓存获取
 	data, err := h.cache.Get(c.Request.Context(), cacheKey)
 	if err != nil {
-		c.Writer.Header().Set("X-Cache", "error")
+		log.Printf("[缓存] 读取缓存失败: key=%s, err=%v", cacheKey, err)
+		c.Writer.Header().Set("X-Cache-Status", "read-error")
 	} else if data != nil {
-		c.Writer.Header().Set("X-Cache", "hit")
+		// 缓存命中
+		log.Printf("[缓存] 缓存命中: key=%s, size=%d bytes", cacheKey, len(data))
+
+		// 生成 ETag (基于内容的MD5)
+		etag := fmt.Sprintf(`"%x"`, md5.Sum(data))
+
+		// 检查客户端是否已经有最新版本
+		if_none_match := c.GetHeader("If-None-Match")
+		if if_none_match == etag {
+			log.Printf("[缓存] ETag 匹配，返回 304: key=%s, etag=%s", cacheKey, etag)
+			c.Writer.Header().Set("ETag", etag)
+			c.Writer.Header().Set("X-Cache-Status", "hit")
+			c.Writer.Header().Set("Cache-Control", "public, max-age=31536000")
+			c.Writer.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+			c.Status(http.StatusNotModified)
+			return
+		}
+
+		// 返回完整响应
+		log.Printf("[缓存] 返回缓存内容: key=%s, etag=%s", cacheKey, etag)
+		c.Writer.Header().Set("ETag", etag)
+		c.Writer.Header().Set("X-Cache-Status", "hit")
 		h.writeImage(c, data)
 		return
 	}
+
+	log.Printf("[缓存] 缓存未命中，开始渲染: key=%s", cacheKey)
 
 	// 缓存未命中，渲染图片
 	data, err = h.renderer.RenderToPNG(c.Request.Context(), &renderer.RenderOptions{
@@ -112,6 +141,7 @@ func (h *Handler) Render(c *gin.Context) {
 		Padding:  req.Padding,
 	})
 	if err != nil {
+		log.Printf("[渲染] 渲染失败: latex=%s, err=%v", req.Latex, err)
 		c.JSON(http.StatusInternalServerError, RenderResponse{
 			Success: false,
 			Message: fmt.Sprintf("渲染失败: %v", err),
@@ -119,11 +149,16 @@ func (h *Handler) Render(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[渲染] 渲染成功: key=%s, size=%d bytes", cacheKey, len(data))
+
 	// 写入缓存
+	log.Printf("[缓存] 写入缓存: key=%s", cacheKey)
 	if err := h.cache.Set(c.Request.Context(), cacheKey, data, h.ttl); err != nil {
-		c.Writer.Header().Set("X-Cache", "write-error")
+		log.Printf("[缓存] 写入缓存失败: key=%s, err=%v", cacheKey, err)
+		c.Writer.Header().Set("X-Cache-Status", "write-error")
 	} else {
-		c.Writer.Header().Set("X-Cache", "miss")
+		log.Printf("[缓存] 写入缓存成功: key=%s", cacheKey)
+		c.Writer.Header().Set("X-Cache-Status", "miss")
 	}
 
 	// 返回图片
@@ -132,9 +167,20 @@ func (h *Handler) Render(c *gin.Context) {
 
 // writeImage 写入图片响应
 func (h *Handler) writeImage(c *gin.Context, data []byte) {
+	// 生成 ETag (基于内容的MD5)
+	etag := fmt.Sprintf(`"%x"`, md5.Sum(data))
+
 	c.Writer.Header().Set("Content-Type", "image/png")
 	c.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	c.Writer.Header().Set("Cache-Control", "public, max-age=31536000")
+	c.Writer.Header().Set("ETag", etag)
+	c.Writer.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+
+	// 添加 X-Cache-Status 头（如果还没有设置）
+	if !c.Writer.Header().Has("X-Cache-Status") {
+		c.Writer.Header().Set("X-Cache-Status", "generated")
+	}
+
 	c.Data(http.StatusOK, "image/png", data)
 }
 
