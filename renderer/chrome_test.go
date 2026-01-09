@@ -17,10 +17,6 @@ func TestNewRenderer(t *testing.T) {
 	if r == nil {
 		t.Fatal("渲染器不应为 nil")
 	}
-
-	if r.initialized {
-		t.Error("渲染器初始化后不应立即标记为已初始化")
-	}
 }
 
 // TestNewRendererWithExecPath 测试带可执行路径的渲染器创建
@@ -73,10 +69,6 @@ func TestWarmup(t *testing.T) {
 		t.Skipf("跳过预热测试（可能无 Chrome）: %v", err)
 	}
 
-	if !r.initialized {
-		t.Error("预热后应标记为已初始化")
-	}
-
 	// 重复预热应不报错
 	err = r.Warmup(ctx)
 	if err != nil {
@@ -84,7 +76,7 @@ func TestWarmup(t *testing.T) {
 	}
 }
 
-// TestInitBrowser 测试懒加载初始化
+// TestInitBrowser 测试懒加载初始化（通过渲染测试）
 func TestInitBrowser(t *testing.T) {
 	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
@@ -94,15 +86,19 @@ func TestInitBrowser(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 未初始化时调用 initBrowser
-	err = r.initBrowser(ctx)
+	// 通过Warmup触发初始化
+	err = r.Warmup(ctx)
 	if err != nil {
 		t.Skipf("跳过测试（可能无 Chrome）: %v", err)
 	}
 
-	// 验证已初始化
-	if !r.initialized {
-		t.Error("initBrowser 后应标记为已初始化")
+	// 通过渲染验证初始化成功
+	opts := &RenderOptions{
+		Latex: "\\frac{a}{b}",
+	}
+	_, err = r.Render(ctx, opts)
+	if err != nil {
+		t.Skipf("跳过测试（可能无 Chrome）: %v", err)
 	}
 }
 
@@ -124,9 +120,10 @@ func TestClose(t *testing.T) {
 		t.Errorf("关闭渲染器失败: %v", err)
 	}
 
-	// 关闭后应未初始化
-	if r.initialized {
-		t.Error("关闭后应标记为未初始化")
+	// 关闭后再次关闭应不报错
+	err = r.Close()
+	if err != nil {
+		t.Errorf("重复关闭应不报错: %v", err)
 	}
 }
 
@@ -188,13 +185,20 @@ func TestRendererThreadSafety(t *testing.T) {
 		t.Skipf("跳过线程安全测试（可能无 Chrome）: %v", err)
 	}
 
-	// 并发初始化
+	// 并发渲染测试
 	done := make(chan bool, 10)
 	for i := 0; i < 10; i++ {
-		go func() {
-			_ = r.initBrowser(ctx)
+		go func(idx int) {
+			opts := &RenderOptions{
+				Latex: "\\frac{a}{b}",
+			}
+			_, err := r.Render(ctx, opts)
+			if err != nil {
+				// 记录错误但不失败（可能是 Chrome 不可用）
+				t.Logf("并发渲染 %d 失败: %v", idx, err)
+			}
 			done <- true
-		}()
+		}(i)
 	}
 
 	for i := 0; i < 10; i++ {

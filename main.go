@@ -122,6 +122,7 @@ func main() {
 		RenderTimeout: cfg.Renderer.RenderTimeout,
 		MaxRetries:    cfg.Renderer.MaxRetries,
 		StaticBaseURL: staticBaseURL,
+		Strategy:      overloadStrategy,
 	})
 	if err != nil {
 		log.Fatalf("初始化渲染器失败: %v", err)

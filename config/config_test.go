@@ -39,8 +39,8 @@ func TestDefault(t *testing.T) {
 		t.Errorf("Log.Level should be 'info', got %s", cfg.Log.Level)
 	}
 	// 验证并发默认值
-	if cfg.MaxConcurrent != 4 {
-		t.Errorf("MaxConcurrent should be 4, got %d", cfg.MaxConcurrent)
+	if cfg.MaxConcurrent != 16 {
+		t.Errorf("MaxConcurrent should be 16, got %d", cfg.MaxConcurrent)
 	}
 	// 验证渲染器默认值
 	if cfg.Renderer.MaxRequests != 100 {
