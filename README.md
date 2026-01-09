@@ -144,6 +144,14 @@ docker run -d --name latex-renderer \
 | `LOG_LEVEL` | 否 | info | 日志级别 (debug/info/warn/error) |
 | `LOG_MAX_SIZE` | 否 | 100 | 单个日志文件最大尺寸 (MB) |
 | `LOG_MAX_FILES` | 否 | 3 | 保留的日志文件数量 |
+| `MAX_CONCURRENT` | 否 | 4 | 最大并发请求数 |
+| `RENDERER_MAX_REQUESTS` | 否 | 100 | 浏览器重启请求阈值 |
+| `RENDERER_MAX_INTERVAL` | 否 | 30m | 浏览器重启时间阈值 |
+| `RENDERER_TIMEOUT` | 否 | 30s | 单次渲染超时时间 |
+| `RENDERER_MAX_RETRIES` | 否 | 2 | 渲染失败最大重试次数 |
+| `RENDERER_QUEUE_SIZE` | 否 | 8 | 排队策略的队列大小 |
+| `RENDERER_QUEUE_TIMEOUT` | 否 | 5s | 排队策略的等待超时时间 |
+| `RENDERER_OVERLOAD_STRATEGY` | 否 | queue | 过载处理策略 (failfast/queue) |
 
 ### 日志配置示例
 
@@ -179,6 +187,54 @@ OSS_SECRET_KEY=your-secret-key \
 | 缓存 Key | `md5(latex|format|fontSize|padding)` |
 
 **注意**: 缓存键基于完整的公式和所有渲染参数。任何参数变化都会生成新的缓存条目。
+
+## 并发控制与过载策略
+
+服务支持两种过载处理策略，通过 `RENDERER_OVERLOAD_STRATEGY` 环境变量配置：
+
+### 1. FailFast (快速失败) - 默认旧版本行为
+当并发数达到上限时，立即返回 503 错误。
+
+```bash
+RENDERER_OVERLOAD_STRATEGY=failfast
+```
+
+**特点**:
+- ⚡ 响应快，立即知道请求被拒绝
+- ❌ 客户端需要自己处理重试逻辑
+- ⚠️ 高并发时失败率较高
+
+### 2. TimeoutQueue (超时排队) - 推荐策略
+当并发数达到上限时，请求进入队列等待，最多等待 `RENDERER_QUEUE_TIMEOUT`。
+
+```bash
+RENDERER_OVERLOAD_STRATEGY=queue
+RENDERER_QUEUE_SIZE=8          # 队列大小（默认 8）
+RENDERER_QUEUE_TIMEOUT=5s      # 排队超时时间（默认 5s）
+```
+
+**特点**:
+- ✅ 对客户端更友好，不会直接拒绝
+- ✅ 可以处理短时间的流量高峰
+- ✅ 通过 `RENDERER_QUEUE_TIMEOUT` 控制最大等待时间
+- ⚠️ 长时间排队可能增加客户端等待时间
+
+**推荐配置**:
+```bash
+# 适合中等并发场景
+RENDERER_OVERLOAD_STRATEGY=queue
+MAX_CONCURRENT=16
+RENDERER_QUEUE_SIZE=16
+RENDERER_QUEUE_TIMEOUT=3s
+```
+
+### 默认配置
+- **策略**: `queue` (超时排队)
+- **并发数**: `16` (基于性能测试优化)
+- **队列大小**: `8`
+- **排队超时**: `5s`
+
+**注意**: 默认并发数已从4优化为16，可提供161%的性能提升（基于测试结果）。
 
 ## 性能数据
 

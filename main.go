@@ -66,15 +66,29 @@ func main() {
 		log.Println("警告: 未找到 Chrome，尝试使用系统默认")
 	}
 
-	// 创建并发限制策略（默认 2 个并发）
+	// 创建并发限制策略
 	maxConcurrent := cfg.MaxConcurrent
 	if maxConcurrent <= 0 {
-		maxConcurrent = 2
+		maxConcurrent = 4
 	}
 	log.Printf("最大并发数: %d", maxConcurrent)
 	log.Printf("浏览器重启阈值: %d 请求 或 %v", cfg.Renderer.MaxRequests, cfg.Renderer.MaxInterval)
 	log.Printf("渲染超时: %v, 最大重试: %d 次", cfg.Renderer.RenderTimeout, cfg.Renderer.MaxRetries)
-	overloadStrategy := renderer.NewFailFastStrategy(maxConcurrent)
+
+	// 根据配置选择过载策略
+	var overloadStrategy renderer.OverloadStrategy
+	switch cfg.Renderer.OverloadStrategy {
+	case "failfast":
+		log.Printf("过载策略: FailFast (快速失败)")
+		overloadStrategy = renderer.NewFailFastStrategy(maxConcurrent)
+	case "queue":
+		log.Printf("过载策略: TimeoutQueue (超时排队)")
+		log.Printf("队列大小: %d, 排队超时: %v", cfg.Renderer.QueueSize, cfg.Renderer.QueueTimeout)
+		overloadStrategy = renderer.NewTimeoutQueueStrategy(maxConcurrent, cfg.Renderer.QueueSize, cfg.Renderer.QueueTimeout)
+	default:
+		log.Printf("过载策略: FailFast (未知策略 '%s'，使用默认)", cfg.Renderer.OverloadStrategy)
+		overloadStrategy = renderer.NewFailFastStrategy(maxConcurrent)
+	}
 
 	// 启动静态文件HTTP服务器（用于KaTeX资源）
 	staticServerPort := 9090

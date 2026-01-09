@@ -35,10 +35,13 @@ type ChromeConfig struct {
 
 // RendererConfig 渲染器配置
 type RendererConfig struct {
-	MaxRequests   int64         `mapstructure:"max_requests"`   // 每多少个请求后重启浏览器
-	MaxInterval   time.Duration `mapstructure:"max_interval"`   // 最大间隔时间后重启浏览器
-	RenderTimeout time.Duration `mapstructure:"render_timeout"` // 单次渲染超时时间
-	MaxRetries    int           `mapstructure:"max_retries"`    // 渲染失败最大重试次数
+	MaxRequests      int64         `mapstructure:"max_requests"`      // 每多少个请求后重启浏览器
+	MaxInterval      time.Duration `mapstructure:"max_interval"`      // 最大间隔时间后重启浏览器
+	RenderTimeout   time.Duration `mapstructure:"render_timeout"`   // 单次渲染超时时间
+	MaxRetries      int           `mapstructure:"max_retries"`     // 渲染失败最大重试次数
+	QueueSize       int           `mapstructure:"queue_size"`       // 并发队列大小
+	QueueTimeout    time.Duration `mapstructure:"queue_timeout"`    // 排队超时时间
+	OverloadStrategy string       `mapstructure:"overload_strategy"` // 过载处理策略 (failfast/queue)
 }
 
 // LogConfig 日志配置
@@ -192,6 +195,21 @@ func LoadFromEnv() (*Config, error) {
 			cfg.Renderer.MaxRetries = n
 		}
 	}
+	if v := os.Getenv("RENDERER_QUEUE_SIZE"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n >= 0 {
+			cfg.Renderer.QueueSize = n
+		}
+	}
+	if v := os.Getenv("RENDERER_QUEUE_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil {
+			cfg.Renderer.QueueTimeout = d
+		}
+	}
+	if v := os.Getenv("RENDERER_OVERLOAD_STRATEGY"); v != "" {
+		cfg.Renderer.OverloadStrategy = v
+	}
 
 	return cfg, nil
 }
@@ -218,17 +236,20 @@ func Default() *Config {
 			Args: "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage",
 		},
 		Renderer: RendererConfig{
-			MaxRequests:   100,              // 每100个请求重启浏览器
-			MaxInterval:   30 * time.Minute, // 每30分钟重启浏览器
-			RenderTimeout: 30 * time.Second, // 单次渲染超时30秒
-			MaxRetries:    2,                // 最多重试2次
+			MaxRequests:       100,               // 每100个请求重启浏览器
+			MaxInterval:       30 * time.Minute,  // 每30分钟重启浏览器
+			RenderTimeout:     30 * time.Second,  // 单次渲染超时30秒
+			MaxRetries:        2,                 // 最多重试2次
+			QueueSize:         8,                 // 默认队列大小
+			QueueTimeout:      5 * time.Second,   // 默认排队超时5秒
+			OverloadStrategy:  "queue",           // 默认使用排队策略
 		},
 		Log: LogConfig{
 			MaxSize:  100,
 			MaxFiles: 3,
 			Level:    "info",
 		},
-		MaxConcurrent: 4, // 默认最多 4 个并发
+		MaxConcurrent: 16, // 默认最多 16 个并发（基于性能测试结果）
 	}
 }
 
@@ -268,7 +289,7 @@ func setDefaults(cfg *Config) {
 		cfg.Log.Level = "info"
 	}
 	if cfg.MaxConcurrent <= 0 {
-		cfg.MaxConcurrent = 4
+		cfg.MaxConcurrent = 16
 	}
 	if cfg.Renderer.MaxRequests <= 0 {
 		cfg.Renderer.MaxRequests = 100
@@ -281,5 +302,14 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.Renderer.MaxRetries <= 0 {
 		cfg.Renderer.MaxRetries = 2
+	}
+	if cfg.Renderer.QueueSize <= 0 {
+		cfg.Renderer.QueueSize = 8
+	}
+	if cfg.Renderer.QueueTimeout <= 0 {
+		cfg.Renderer.QueueTimeout = 5 * time.Second
+	}
+	if cfg.Renderer.OverloadStrategy == "" {
+		cfg.Renderer.OverloadStrategy = "queue"
 	}
 }
