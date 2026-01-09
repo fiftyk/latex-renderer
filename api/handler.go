@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -177,7 +176,7 @@ func (h *Handler) writeImage(c *gin.Context, data []byte) {
 	c.Writer.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
 
 	// 添加 X-Cache-Status 头（如果还没有设置）
-	if !c.Writer.Header().Has("X-Cache-Status") {
+	if c.Writer.Header().Get("X-Cache-Status") == "" {
 		c.Writer.Header().Set("X-Cache-Status", "generated")
 	}
 
