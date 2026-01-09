@@ -178,6 +178,9 @@ func generateTestHTML(padding, background, fontSize, color, latex string) string
       font-size: ` + fontSize + `px;
       color: ` + color + `;
     }
+    .katex-display {
+      margin: 0;
+    }
   </style>
 </head>
 <body>

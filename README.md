@@ -5,7 +5,7 @@
 ## 功能特性
 
 - 支持 LaTeX 数学公式渲染（KaTeX）
-- 支持自定义样式（颜色、背景、字体大小、内边距）
+- 支持自定义样式（字体大小、内边距）
 - 支持多种缓存后端（本地文件系统、阿里云 OSS、腾讯云 COS）
 - 高性能，首次渲染后缓存命中响应 < 1ms
 - 启动预热，Chrome 浏览器复用，避免首次请求慢
@@ -27,8 +27,6 @@ GET /api?latex=<LaTeX公式>
 | `format` | 否 | png | 输出格式 (仅支持 png) | `format=png` |
 | `fontSize` | 否 | 16 | 字体大小 (px, 8-72) | `fontSize=24` |
 | `padding` | 否 | 20 | 内边距 (px, 0-200) | `padding=50` |
-| `color` | 否 | #000000 | 文字颜色 (十六进制) | `color=#ff0000` |
-| `background` | 否 | transparent | 背景颜色 (十六进制或 transparent) | `background=#ffffff` |
 
 ### 使用示例
 
@@ -42,14 +40,8 @@ curl "http://localhost:8080/api?latex=E=mc^2&fontSize=24" -o large.png
 # 大内边距
 curl "http://localhost:8080/api?latex=\int_{0}^{\infty}&padding=50" -o padded.png
 
-# 自定义颜色
-curl "http://localhost:8080/api?latex=E=mc^2&color=#ff0000" -o red.png
-
-# 白色背景
-curl "http://localhost:8080/api?latex=E=mc^2&background=#ffffff" -o white_bg.png
-
 # 组合使用
-curl "http://localhost:8080/api?latex=x^2+y^2=z^2&fontSize=32&color=#0000ff&background=#ffff00" -o custom.png
+curl "http://localhost:8080/api?latex=x^2+y^2=z^2&fontSize=32&padding=20" -o custom.png
 ```
 
 ### 其他接口
@@ -184,7 +176,7 @@ OSS_SECRET_KEY=your-secret-key \
 |------|------|
 | 首次请求 | 渲染公式并写入缓存 |
 | 后续请求 | 直接返回缓存数据 (响应 < 1ms) |
-| 缓存 Key | `md5(latex|format|fontSize|padding|color|background)` |
+| 缓存 Key | `md5(latex|format|fontSize|padding)` |
 
 **注意**: 缓存键基于完整的公式和所有渲染参数。任何参数变化都会生成新的缓存条目。
 

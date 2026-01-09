@@ -291,6 +291,9 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
       font-size: %spx;
       color: %s;
     }
+    .katex-display {
+      margin: 0;
+    }
   </style>
 </head>
 <body>
