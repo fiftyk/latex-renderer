@@ -8,7 +8,7 @@ import (
 
 // TestNewRenderer 测试创建渲染器
 func TestNewRenderer(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -25,7 +25,10 @@ func TestNewRenderer(t *testing.T) {
 
 // TestNewRendererWithExecPath 测试带可执行路径的渲染器创建
 func TestNewRendererWithExecPath(t *testing.T) {
-	r, err := NewRenderer("/usr/bin/chrome", "--no-sandbox")
+	r, err := NewRenderer(&RendererOptions{
+		ExecPath: "/usr/bin/chrome",
+		Args:     "--no-sandbox",
+	})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -45,7 +48,7 @@ func TestNewRendererWithArgs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, err := NewRenderer("", tc.args)
+			r, err := NewRenderer(&RendererOptions{Args: tc.args})
 			if err != nil {
 				t.Fatalf("创建渲染器失败: %v", err)
 			}
@@ -56,7 +59,7 @@ func TestNewRendererWithArgs(t *testing.T) {
 
 // TestWarmup 测试预热功能
 func TestWarmup(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -83,7 +86,7 @@ func TestWarmup(t *testing.T) {
 
 // TestInitBrowser 测试懒加载初始化
 func TestInitBrowser(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -105,7 +108,7 @@ func TestInitBrowser(t *testing.T) {
 
 // TestClose 测试关闭渲染器
 func TestClose(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -129,7 +132,7 @@ func TestClose(t *testing.T) {
 
 // TestCloseUninitialized 测试关闭未初始化的渲染器
 func TestCloseUninitialized(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -172,7 +175,7 @@ func TestRenderOptions(t *testing.T) {
 
 // TestRendererThreadSafety 测试渲染器线程安全
 func TestRendererThreadSafety(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}

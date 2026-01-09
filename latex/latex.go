@@ -50,9 +50,11 @@ type Client struct {
 // NewClient 创建渲染客户端
 func NewClient(cfg *Config) (*Client, error) {
 	// 创建渲染器
-	// 默认并发数为2
-	maxConcurrent := 2
-	r, err := renderer.NewRenderer(cfg.ChromePath, cfg.ChromeArgs, maxConcurrent)
+	r, err := renderer.NewRenderer(&renderer.RendererOptions{
+		ExecPath:      cfg.ChromePath,
+		Args:          cfg.ChromeArgs,
+		MaxConcurrent: 4,
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -38,6 +38,23 @@ func TestDefault(t *testing.T) {
 	if cfg.Log.Level != "info" {
 		t.Errorf("Log.Level should be 'info', got %s", cfg.Log.Level)
 	}
+	// 验证并发默认值
+	if cfg.MaxConcurrent != 4 {
+		t.Errorf("MaxConcurrent should be 4, got %d", cfg.MaxConcurrent)
+	}
+	// 验证渲染器默认值
+	if cfg.Renderer.MaxRequests != 100 {
+		t.Errorf("Renderer.MaxRequests should be 100, got %d", cfg.Renderer.MaxRequests)
+	}
+	if cfg.Renderer.MaxInterval != 30*time.Minute {
+		t.Errorf("Renderer.MaxInterval should be 30m, got %v", cfg.Renderer.MaxInterval)
+	}
+	if cfg.Renderer.RenderTimeout != 30*time.Second {
+		t.Errorf("Renderer.RenderTimeout should be 30s, got %v", cfg.Renderer.RenderTimeout)
+	}
+	if cfg.Renderer.MaxRetries != 2 {
+		t.Errorf("Renderer.MaxRetries should be 2, got %d", cfg.Renderer.MaxRetries)
+	}
 }
 
 func TestLoadFromEnv(t *testing.T) {
@@ -142,5 +159,41 @@ func TestLoadFromEnv_LogConfig(t *testing.T) {
 	}
 	if cfg.Log.Level != "debug" {
 		t.Errorf("Log.Level should be 'debug', got %s", cfg.Log.Level)
+	}
+}
+
+func TestLoadFromEnv_RendererConfig(t *testing.T) {
+	os.Setenv("RENDERER_MAX_REQUESTS", "200")
+	os.Setenv("RENDERER_MAX_INTERVAL", "1h")
+	os.Setenv("RENDERER_TIMEOUT", "60s")
+	os.Setenv("RENDERER_MAX_RETRIES", "3")
+	os.Setenv("MAX_CONCURRENT", "8")
+	defer func() {
+		os.Unsetenv("RENDERER_MAX_REQUESTS")
+		os.Unsetenv("RENDERER_MAX_INTERVAL")
+		os.Unsetenv("RENDERER_TIMEOUT")
+		os.Unsetenv("RENDERER_MAX_RETRIES")
+		os.Unsetenv("MAX_CONCURRENT")
+	}()
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("LoadFromEnv 失败: %v", err)
+	}
+
+	if cfg.Renderer.MaxRequests != 200 {
+		t.Errorf("Renderer.MaxRequests should be 200, got %d", cfg.Renderer.MaxRequests)
+	}
+	if cfg.Renderer.MaxInterval != 1*time.Hour {
+		t.Errorf("Renderer.MaxInterval should be 1h, got %v", cfg.Renderer.MaxInterval)
+	}
+	if cfg.Renderer.RenderTimeout != 60*time.Second {
+		t.Errorf("Renderer.RenderTimeout should be 60s, got %v", cfg.Renderer.RenderTimeout)
+	}
+	if cfg.Renderer.MaxRetries != 3 {
+		t.Errorf("Renderer.MaxRetries should be 3, got %d", cfg.Renderer.MaxRetries)
+	}
+	if cfg.MaxConcurrent != 8 {
+		t.Errorf("MaxConcurrent should be 8, got %d", cfg.MaxConcurrent)
 	}
 }

@@ -13,11 +13,12 @@ import (
 
 // Config 应用配置
 type Config struct {
-	Server        ServerConfig    `mapstructure:"server"`
-	Cache         cacheConfig     `mapstructure:"cache"`
-	Chrome        ChromeConfig    `mapstructure:"chrome"`
-	Log           LogConfig       `mapstructure:"log"`
-	MaxConcurrent int             `mapstructure:"max_concurrent"` // 最大并发数
+	Server        ServerConfig   `mapstructure:"server"`
+	Cache         cacheConfig    `mapstructure:"cache"`
+	Chrome        ChromeConfig   `mapstructure:"chrome"`
+	Renderer      RendererConfig `mapstructure:"renderer"`
+	Log           LogConfig      `mapstructure:"log"`
+	MaxConcurrent int            `mapstructure:"max_concurrent"` // 最大并发数
 }
 
 // ServerConfig 服务器配置
@@ -30,6 +31,14 @@ type ServerConfig struct {
 type ChromeConfig struct {
 	ExecutablePath string `mapstructure:"executable_path"`
 	Args           string `mapstructure:"args"`
+}
+
+// RendererConfig 渲染器配置
+type RendererConfig struct {
+	MaxRequests   int64         `mapstructure:"max_requests"`   // 每多少个请求后重启浏览器
+	MaxInterval   time.Duration `mapstructure:"max_interval"`   // 最大间隔时间后重启浏览器
+	RenderTimeout time.Duration `mapstructure:"render_timeout"` // 单次渲染超时时间
+	MaxRetries    int           `mapstructure:"max_retries"`    // 渲染失败最大重试次数
 }
 
 // LogConfig 日志配置
@@ -158,6 +167,32 @@ func LoadFromEnv() (*Config, error) {
 		}
 	}
 
+	// 渲染器配置
+	if v := os.Getenv("RENDERER_MAX_REQUESTS"); v != "" {
+		var n int64
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+			cfg.Renderer.MaxRequests = n
+		}
+	}
+	if v := os.Getenv("RENDERER_MAX_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil {
+			cfg.Renderer.MaxInterval = d
+		}
+	}
+	if v := os.Getenv("RENDERER_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil {
+			cfg.Renderer.RenderTimeout = d
+		}
+	}
+	if v := os.Getenv("RENDERER_MAX_RETRIES"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n >= 0 {
+			cfg.Renderer.MaxRetries = n
+		}
+	}
+
 	return cfg, nil
 }
 
@@ -182,12 +217,18 @@ func Default() *Config {
 		Chrome: ChromeConfig{
 			Args: "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage",
 		},
+		Renderer: RendererConfig{
+			MaxRequests:   100,              // 每100个请求重启浏览器
+			MaxInterval:   30 * time.Minute, // 每30分钟重启浏览器
+			RenderTimeout: 30 * time.Second, // 单次渲染超时30秒
+			MaxRetries:    2,                // 最多重试2次
+		},
 		Log: LogConfig{
 			MaxSize:  100,
 			MaxFiles: 3,
 			Level:    "info",
 		},
-		MaxConcurrent: 2, // 默认最多 2 个并发
+		MaxConcurrent: 4, // 默认最多 4 个并发
 	}
 }
 
@@ -227,6 +268,18 @@ func setDefaults(cfg *Config) {
 		cfg.Log.Level = "info"
 	}
 	if cfg.MaxConcurrent <= 0 {
-		cfg.MaxConcurrent = 2
+		cfg.MaxConcurrent = 4
+	}
+	if cfg.Renderer.MaxRequests <= 0 {
+		cfg.Renderer.MaxRequests = 100
+	}
+	if cfg.Renderer.MaxInterval <= 0 {
+		cfg.Renderer.MaxInterval = 30 * time.Minute
+	}
+	if cfg.Renderer.RenderTimeout <= 0 {
+		cfg.Renderer.RenderTimeout = 30 * time.Second
+	}
+	if cfg.Renderer.MaxRetries <= 0 {
+		cfg.Renderer.MaxRetries = 2
 	}
 }

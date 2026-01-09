@@ -72,6 +72,8 @@ func main() {
 		maxConcurrent = 2
 	}
 	log.Printf("最大并发数: %d", maxConcurrent)
+	log.Printf("浏览器重启阈值: %d 请求 或 %v", cfg.Renderer.MaxRequests, cfg.Renderer.MaxInterval)
+	log.Printf("渲染超时: %v, 最大重试: %d 次", cfg.Renderer.RenderTimeout, cfg.Renderer.MaxRetries)
 	overloadStrategy := renderer.NewFailFastStrategy(maxConcurrent)
 
 	// 启动静态文件HTTP服务器（用于KaTeX资源）
@@ -96,8 +98,17 @@ func main() {
 
 	staticBaseURL := fmt.Sprintf("http://%s", staticAddr)
 
-	// 初始化渲染器（传入静态资源URL）
-	r, err := renderer.NewRenderer(cfg.Chrome.ExecutablePath, cfg.Chrome.Args, maxConcurrent, staticBaseURL)
+	// 初始化渲染器（传入配置）
+	r, err := renderer.NewRenderer(&renderer.RendererOptions{
+		ExecPath:      cfg.Chrome.ExecutablePath,
+		Args:          cfg.Chrome.Args,
+		MaxConcurrent: maxConcurrent,
+		MaxRequests:   cfg.Renderer.MaxRequests,
+		MaxInterval:   cfg.Renderer.MaxInterval,
+		RenderTimeout: cfg.Renderer.RenderTimeout,
+		MaxRetries:    cfg.Renderer.MaxRetries,
+		StaticBaseURL: staticBaseURL,
+	})
 	if err != nil {
 		log.Fatalf("初始化渲染器失败: %v", err)
 	}

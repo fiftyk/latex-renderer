@@ -9,7 +9,7 @@ import (
 // TestRenderPadding 测试 padding 参数生效
 // 这个测试验证 padding 是否正确应用到 HTML 和截图元素
 func TestRenderPadding(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestRenderPadding(t *testing.T) {
 
 // TestRenderWithDifferentPadding 测试不同 padding 值的渲染
 func TestRenderWithDifferentPadding(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}
@@ -200,7 +200,7 @@ func generateTestHTML(padding, background, fontSize, color, latex string) string
 
 // TestRenderWithBackground 测试背景色和 padding 组合
 func TestRenderWithBackground(t *testing.T) {
-	r, err := NewRenderer("", "")
+	r, err := NewRenderer(&RendererOptions{})
 	if err != nil {
 		t.Fatalf("创建渲染器失败: %v", err)
 	}

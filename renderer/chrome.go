@@ -66,6 +66,8 @@ type Renderer struct {
 	maxRequests      int64         // 最大请求数后重启浏览器
 	lastRestart      time.Time     // 上次重启时间
 	maxInterval      time.Duration // 最大间隔时间
+	renderTimeout    time.Duration // 单次渲染超时时间
+	maxRetries       int           // 渲染失败最大重试次数
 	overloadStrategy OverloadStrategy
 	staticBaseURL    string // 静态资源基础URL
 }
@@ -79,12 +81,20 @@ type RenderOptions struct {
 	Padding    string // 内边距 px (默认 20)
 }
 
+// RendererOptions 渲染器配置选项
+type RendererOptions struct {
+	ExecPath      string        // Chrome 可执行文件路径
+	Args          string        // Chrome 启动参数
+	MaxConcurrent int           // 最大并发数
+	MaxRequests   int64         // 每多少个请求后重启浏览器
+	MaxInterval   time.Duration // 最大间隔时间后重启浏览器
+	RenderTimeout time.Duration // 单次渲染超时时间
+	MaxRetries    int           // 渲染失败最大重试次数
+	StaticBaseURL string        // 静态资源基础URL
+}
+
 // NewRenderer 创建渲染器
-func NewRenderer(execPath, args string, maxConcurrent int, staticBaseURL ...string) (*Renderer, error) {
-	var baseURL string
-	if len(staticBaseURL) > 0 {
-		baseURL = staticBaseURL[0]
-	}
+func NewRenderer(ropts *RendererOptions) (*Renderer, error) {
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
@@ -94,8 +104,8 @@ func NewRenderer(execPath, args string, maxConcurrent int, staticBaseURL ...stri
 	}
 
 	// 添加额外的 Chrome 参数
-	if args != "" {
-		for _, part := range strings.Fields(args) {
+	if ropts.Args != "" {
+		for _, part := range strings.Fields(ropts.Args) {
 			if strings.HasPrefix(part, "--") {
 				// 处理 --flag=value 格式
 				if kv := strings.SplitN(part, "=", 2); len(kv) == 2 {
@@ -108,22 +118,41 @@ func NewRenderer(execPath, args string, maxConcurrent int, staticBaseURL ...stri
 		}
 	}
 
-	if execPath != "" {
-		opts = append(opts, chromedp.ExecPath(execPath))
+	if ropts.ExecPath != "" {
+		opts = append(opts, chromedp.ExecPath(ropts.ExecPath))
 	}
 
-	// 默认并发数为 2
+	// 默认值
+	maxConcurrent := ropts.MaxConcurrent
 	if maxConcurrent <= 0 {
-		maxConcurrent = 2
+		maxConcurrent = 4
+	}
+	maxRequests := ropts.MaxRequests
+	if maxRequests <= 0 {
+		maxRequests = 100
+	}
+	maxInterval := ropts.MaxInterval
+	if maxInterval <= 0 {
+		maxInterval = 30 * time.Minute
+	}
+	renderTimeout := ropts.RenderTimeout
+	if renderTimeout <= 0 {
+		renderTimeout = 30 * time.Second
+	}
+	maxRetries := ropts.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 2
 	}
 
 	return &Renderer{
 		allocOpts:        opts,
-		maxRequests:      10,               // 每10个请求重启一次（更频繁重启避免崩溃）
-		maxInterval:      5 * time.Minute,  // 或每5分钟重启一次（更频繁重启避免崩溃）
+		maxRequests:      maxRequests,
+		maxInterval:      maxInterval,
+		renderTimeout:    renderTimeout,
+		maxRetries:       maxRetries,
 		lastRestart:      time.Now(),
 		overloadStrategy: NewFailFastStrategy(maxConcurrent),
-		staticBaseURL:    baseURL,
+		staticBaseURL:    ropts.StaticBaseURL,
 	}, nil
 }
 
@@ -314,16 +343,16 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 	browserCtx, cancel := chromedp.NewContext(r.allocCtx)
 	defer cancel()
 
-	// 设置超时 - 缩短到10秒，快速失败
-	renderCtx, cancel := context.WithTimeout(browserCtx, 10*time.Second)
+	// 设置超时
+	renderCtx, cancel := context.WithTimeout(browserCtx, r.renderTimeout)
 	defer cancel()
 
 	// 执行渲染 - 添加重试机制
 	var buf []byte
 	var err error
 
-	// 最多重试2次
-	for attempt := 0; attempt < 2; attempt++ {
+	// 最多重试 maxRetries 次
+	for attempt := 0; attempt < r.maxRetries; attempt++ {
 		if attempt > 0 {
 			// 重试前重启浏览器
 			log.Println("渲染失败，重启浏览器...")
@@ -337,7 +366,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 			// 创建新的browser context
 			browserCtx, cancel = chromedp.NewContext(r.allocCtx)
 			defer cancel()
-			renderCtx, cancel = context.WithTimeout(browserCtx, 10*time.Second)
+			renderCtx, cancel = context.WithTimeout(browserCtx, r.renderTimeout)
 			defer cancel()
 		}
 
@@ -355,7 +384,7 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 		}
 
 		// 如果是最后一次尝试，返回错误
-		if attempt == 1 {
+		if attempt == r.maxRetries-1 {
 			return nil, fmt.Errorf("渲染失败 (尝试 %d 次): %w", attempt+1, err)
 		}
 
