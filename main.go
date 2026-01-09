@@ -94,7 +94,7 @@ func main() {
 	staticBaseURL := fmt.Sprintf("http://%s", staticAddr)
 
 	// 初始化渲染器（传入静态资源URL）
-	r, err = renderer.NewRenderer(cfg.Chrome.ExecutablePath, cfg.Chrome.Args, maxConcurrent, staticBaseURL)
+	r, err := renderer.NewRenderer(cfg.Chrome.ExecutablePath, cfg.Chrome.Args, maxConcurrent, staticBaseURL)
 	if err != nil {
 		log.Fatalf("初始化渲染器失败: %v", err)
 	}
