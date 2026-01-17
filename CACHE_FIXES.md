@@ -95,7 +95,7 @@ curl -i -H "If-None-Match: \"etag-value\"" "http://localhost:8080/api?latex=E=mc
 [缓存] 写入缓存成功: key=latex/abc123.png
 ```
 
-### 检查缓存文件
+### 检查本地缓存文件
 
 ```bash
 # 查看缓存目录
@@ -104,6 +104,108 @@ ls -la ./cache/latex/
 # 查看特定缓存文件
 ls -lh ./cache/latex/<hash>.png
 ```
+
+## OSS 缓存
+
+### 概述
+
+服务支持阿里云 OSS 和腾讯云 COS 作为缓存后端，相比本地文件系统具有以下优势：
+- **高可用**: OSS 服务本身具备高可用性
+- **跨机器共享**: 多实例部署时共享缓存
+- **低成本**: 无需管理本地存储空间
+- **CDN 加速**: 可配置自定义域名使用 CDN
+
+### 切换缓存类型
+
+服务支持两种缓存后端，通过 `CACHE_TYPE` 环境变量切换：
+
+```bash
+# 使用本地缓存（默认）
+export CACHE_TYPE=local
+./latex-renderer
+
+# 使用 OSS 缓存
+export CACHE_TYPE=oss
+export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+export OSS_BUCKET=your-bucket
+export OSS_ACCESS_KEY=your-access-key
+export OSS_SECRET_KEY=your-secret-key
+./latex-renderer
+```
+
+**验证切换**: 查看启动日志，确认显示 `[缓存] 使用本地缓存` 或 `[缓存] 使用 OSS 缓存`。
+
+**注意**: 切换后新缓存写入新位置，原有缓存不会自动迁移。
+
+### OSS 配置
+
+**环境变量配置**:
+```bash
+# 切换到 OSS 缓存
+export CACHE_TYPE=oss
+
+# OSS 配置
+export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+export OSS_BUCKET=your-bucket-name
+export OSS_ACCESS_KEY=your-access-key
+export OSS_SECRET_KEY=your-secret-key
+export OSS_DOMAIN=cdn.your-domain.com  # 可选，自定义域名
+export OSS_TTL=168h  # 可选，缓存过期时间，默认 7 天
+```
+
+### OSS 缓存验证
+
+```bash
+# 检查 OSS 控制台，验证文件上传
+# bucket 中应该看到 latex/*.png 文件
+
+# 测试渲染请求
+curl -i "http://localhost:8080/api?latex=E=mc^2"
+
+# 查看响应头确认使用 OSS
+# X-Cache-Status: generated
+```
+
+### OSS 注意事项
+
+1. **网络延迟**: OSS 访问有网络延迟，缓存命中时间略长于本地缓存
+2. **费用**: 注意 OSS 请求次数和数据传输费用
+3. **权限**: 确保 AccessKey 有 bucket 的读写权限
+4. **域名**: 建议配置自定义域名并启用 CDN 加速
+
+## 缓存迁移
+
+### 从本地迁移到 OSS
+
+如果已有大量本地缓存文件，可以使用迁移脚本批量上传到 OSS：
+
+```bash
+# 预览迁移（推荐先预览）
+go run scripts/migrate_cache.go \
+  --dry-run \
+  --oss-endpoint oss-cn-hangzhou.aliyuncs.com \
+  --oss-bucket your-bucket \
+  --oss-access-key your-access-key \
+  --oss-secret-key your-secret-key
+
+# 执行迁移
+go run scripts/migrate_cache.go \
+  --oss-endpoint oss-cn-hangzhou.aliyuncs.com \
+  --oss-bucket your-bucket \
+  --oss-access-key your-access-key \
+  --oss-secret-key your-secret-key
+```
+
+**迁移前准备**:
+1. 确保 OSS bucket 已创建
+2. 配置好访问凭证
+3. 可选：配置自定义域名和 CDN
+
+**迁移后操作**:
+1. 验证 OSS 中的文件数量
+2. 设置 `CACHE_TYPE=oss`
+3. 重启服务
+4. 测试渲染请求确认缓存命中
 
 ## 潜在问题排查
 
@@ -156,6 +258,9 @@ chmod +x test_cache.sh
 ## 相关文件
 
 - `api/handler.go`: HTTP处理器，缓存逻辑
+- `cache/cache.go`: 缓存接口定义
 - `cache/local.go`: 本地文件系统缓存实现
+- `cache/oss.go`: OSS 云存储缓存实现
 - `main.go`: 主程序，缓存初始化
 - `config/config.go`: 缓存配置
+- `scripts/migrate_cache.go`: 缓存迁移脚本

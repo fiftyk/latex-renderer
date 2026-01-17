@@ -166,17 +166,68 @@ LOG_PATH= ./latex-renderer
 LOG_LEVEL=debug LOG_PATH=/var/log/latex-renderer/app.log ./latex-renderer
 ```
 
-### OSS 部署示例
+### 切换缓存类型
+
+服务支持本地文件系统和阿里云 OSS 两种缓存后端，通过 `CACHE_TYPE` 环境变量切换：
 
 ```bash
-# 使用阿里云 OSS
-CACHE_TYPE=oss \
-OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com \
-OSS_BUCKET=your-bucket \
-OSS_ACCESS_KEY=your-access-key \
-OSS_SECRET_KEY=your-secret-key \
+# 使用本地缓存（默认）
+export CACHE_TYPE=local
+./latex-renderer
+
+# 使用 OSS 缓存
+export CACHE_TYPE=oss
+export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+export OSS_BUCKET=your-bucket
+export OSS_ACCESS_KEY=your-access-key
+export OSS_SECRET_KEY=your-secret-key
 ./latex-renderer
 ```
+
+**切换后**: 新缓存会写入新位置，原有缓存不会自动迁移。如需迁移已有缓存，参考下方"缓存迁移"章节。
+
+**验证切换**: 查看启动日志，确认显示 `[缓存] 使用本地缓存` 或 `[缓存] 使用 OSS 缓存`。
+
+### 缓存迁移
+
+如果需要将本地缓存迁移到 OSS，可以使用迁移脚本：
+
+```bash
+# 预览迁移（只显示不执行）
+go run scripts/migrate_cache.go \
+  --dry-run \
+  --oss-endpoint oss-cn-hangzhou.aliyuncs.com \
+  --oss-bucket your-bucket \
+  --oss-access-key your-access-key \
+  --oss-secret-key your-secret-key
+
+# 执行迁移
+go run scripts/migrate_cache.go \
+  --oss-endpoint oss-cn-hangzhou.aliyuncs.com \
+  --oss-bucket your-bucket \
+  --oss-access-key your-access-key \
+  --oss-secret-key your-secret-key
+
+# 使用环境变量
+export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+export OSS_BUCKET=your-bucket
+export OSS_ACCESS_KEY=your-access-key
+export OSS_SECRET_KEY=your-secret-key
+go run scripts/migrate_cache.go --dry-run  # 预览
+go run scripts/migrate_cache.go             # 执行
+```
+
+**迁移脚本选项**:
+| 选项 | 默认值 | 说明 |
+|------|--------|------|
+| `--local` | ./cache | 本地缓存目录 |
+| `--oss-endpoint` | - | OSS endpoint (必填) |
+| `--oss-bucket` | - | OSS bucket 名称 (必填) |
+| `--oss-access-key` | - | OSS access key (必填) |
+| `--oss-secret-key` | - | OSS secret key (必填) |
+| `--oss-domain` | - | OSS 自定义域名 (可选) |
+| `--parallel` | 4 | 并发上传数 |
+| `--dry-run` | false | 预览模式，只显示不执行 |
 
 ## 缓存策略
 
