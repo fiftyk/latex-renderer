@@ -16,6 +16,7 @@ type OSSCache struct {
 	client     *oss.Client
 	bucket     *oss.Bucket
 	domain     string
+	prefix     string
 	ttl        time.Duration
 	endpoint   string
 	bucketName string
@@ -55,6 +56,7 @@ func NewOSSCache(cfg *OSSConfig) (*OSSCache, error) {
 		client:     client,
 		bucket:     bucket,
 		domain:     cfg.Domain,
+		prefix:     cfg.Prefix,
 		ttl:        cfg.TTL,
 		endpoint:   cfg.Endpoint,
 		bucketName: cfg.Bucket,
@@ -66,10 +68,21 @@ func (c *OSSCache) Name() string {
 	return "oss"
 }
 
+// buildKey 构建带前缀的存储 key
+func (c *OSSCache) buildKey(key string) string {
+	if c.prefix == "" {
+		return key
+	}
+	// 确保前缀以 / 结尾
+	prefix := strings.TrimSuffix(c.prefix, "/") + "/"
+	return prefix + key
+}
+
 // Get 获取缓存
 func (c *OSSCache) Get(ctx context.Context, key string) ([]byte, error) {
+	ossKey := c.buildKey(key)
 	// 检查对象是否存在
-	exist, err := c.bucket.IsObjectExist(key)
+	exist, err := c.bucket.IsObjectExist(ossKey)
 	if err != nil {
 		return nil, fmt.Errorf("检查 OSS 对象失败: %w", err)
 	}
@@ -78,7 +91,7 @@ func (c *OSSCache) Get(ctx context.Context, key string) ([]byte, error) {
 	}
 
 	// 获取对象元数据
-	props, err := c.bucket.GetObjectDetailedMeta(key)
+	props, err := c.bucket.GetObjectDetailedMeta(ossKey)
 	if err != nil {
 		return nil, fmt.Errorf("获取 OSS 对象元数据失败: %w", err)
 	}
@@ -88,13 +101,13 @@ func (c *OSSCache) Get(ctx context.Context, key string) ([]byte, error) {
 		t, err := time.Parse(http.TimeFormat, lastModified)
 		if err == nil && time.Since(t) > c.ttl {
 			// 删除过期缓存
-			c.bucket.DeleteObject(key)
+			c.bucket.DeleteObject(ossKey)
 			return nil, nil
 		}
 	}
 
 	// 下载对象
-	data, err := c.bucket.GetObject(key)
+	data, err := c.bucket.GetObject(ossKey)
 	if err != nil {
 		return nil, fmt.Errorf("下载 OSS 对象失败: %w", err)
 	}
@@ -111,6 +124,7 @@ func (c *OSSCache) Get(ctx context.Context, key string) ([]byte, error) {
 
 // Set 设置缓存
 func (c *OSSCache) Set(ctx context.Context, key string, data []byte, ttl time.Duration) error {
+	ossKey := c.buildKey(key)
 	// 设置过期时间
 	expiry := time.Now().Add(ttl)
 	opts := []oss.Option{
@@ -119,7 +133,7 @@ func (c *OSSCache) Set(ctx context.Context, key string, data []byte, ttl time.Du
 	}
 
 	// 上传对象
-	err := c.bucket.PutObject(key, strings.NewReader(string(data)), opts...)
+	err := c.bucket.PutObject(ossKey, strings.NewReader(string(data)), opts...)
 	if err != nil {
 		return fmt.Errorf("上传 OSS 对象失败: %w", err)
 	}
@@ -129,7 +143,8 @@ func (c *OSSCache) Set(ctx context.Context, key string, data []byte, ttl time.Du
 
 // Delete 删除缓存
 func (c *OSSCache) Delete(ctx context.Context, key string) error {
-	err := c.bucket.DeleteObject(key)
+	ossKey := c.buildKey(key)
+	err := c.bucket.DeleteObject(ossKey)
 	if err != nil {
 		return fmt.Errorf("删除 OSS 对象失败: %w", err)
 	}
@@ -138,7 +153,8 @@ func (c *OSSCache) Delete(ctx context.Context, key string) error {
 
 // Exists 检查缓存是否存在
 func (c *OSSCache) Exists(ctx context.Context, key string) (bool, error) {
-	exist, err := c.bucket.IsObjectExist(key)
+	ossKey := c.buildKey(key)
+	exist, err := c.bucket.IsObjectExist(ossKey)
 	if err != nil {
 		return false, fmt.Errorf("检查 OSS 对象失败: %w", err)
 	}
@@ -147,14 +163,15 @@ func (c *OSSCache) Exists(ctx context.Context, key string) (bool, error) {
 
 // GetURL 返回 OSS 访问 URL
 func (c *OSSCache) GetURL(ctx context.Context, key string) (string, error) {
+	ossKey := c.buildKey(key)
 	// 如果配置了自定义 domain，使用自定义 domain
 	if c.domain != "" {
-		u := fmt.Sprintf("%s/%s", strings.TrimSuffix(c.domain, "/"), key)
+		u := fmt.Sprintf("%s/%s", strings.TrimSuffix(c.domain, "/"), ossKey)
 		return u, nil
 	}
 
 	// 否则生成签名 URL (临时访问链接)
-	signedURL, err := c.bucket.SignURL(key, "GET", 3600) // 1小时有效
+	signedURL, err := c.bucket.SignURL(ossKey, "GET", 3600) // 1小时有效
 	if err != nil {
 		return "", fmt.Errorf("生成签名 URL 失败: %w", err)
 	}
@@ -164,9 +181,10 @@ func (c *OSSCache) GetURL(ctx context.Context, key string) (string, error) {
 
 // GetPublicURL 返回公开访问 URL (需要 bucket 设置为公开读取)
 func (c *OSSCache) GetPublicURL(key string) string {
+	ossKey := c.buildKey(key)
 	if c.domain != "" {
-		return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.domain, "/"), key)
+		return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.domain, "/"), ossKey)
 	}
 	// 默认的 OSS 外网地址
-	return fmt.Sprintf("https://%s.%s/%s", c.bucketName, c.endpoint, key)
+	return fmt.Sprintf("https://%s.%s/%s", c.bucketName, c.endpoint, ossKey)
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ var (
 // Config 迁移配置
 type Config struct {
 	LocalDir     string
+	OSSPrefix    string
 	OSSEndpoint  string
 	OSSBucket    string
 	OSSAccessKey string
@@ -107,6 +109,7 @@ func parseFlags() *Config {
 	cfg := &Config{}
 
 	flag.StringVar(&cfg.LocalDir, "local", "./cache", "本地缓存目录")
+	flag.StringVar(&cfg.OSSPrefix, "oss-prefix", "latex/", "OSS 存储前缀")
 	flag.StringVar(&cfg.OSSEndpoint, "oss-endpoint", "", "OSS endpoint")
 	flag.StringVar(&cfg.OSSBucket, "oss-bucket", "", "OSS bucket 名称")
 	flag.StringVar(&cfg.OSSAccessKey, "oss-access-key", "", "OSS access key")
@@ -135,6 +138,9 @@ func parseFlags() *Config {
 	}
 	if cfg.OSSDomain == "" {
 		cfg.OSSDomain = os.Getenv("OSS_DOMAIN")
+	}
+	if cfg.OSSPrefix == "" {
+		cfg.OSSPrefix = os.Getenv("OSS_PREFIX")
 	}
 
 	return cfg
@@ -195,6 +201,9 @@ func migrateFiles(cfg *Config, files []FileInfo) []MigrateResult {
 		log.Fatalf("获取 bucket 失败: %v", err)
 	}
 
+	// 构建带前缀的 key
+	prefix := strings.TrimSuffix(cfg.OSSPrefix, "/") + "/"
+
 	// 初始化结果数组
 	results := make([]MigrateResult, len(files))
 
@@ -223,8 +232,9 @@ func migrateFiles(cfg *Config, files []FileInfo) []MigrateResult {
 				return
 			}
 
-			// 上传到 OSS
-			err = bucket.PutObject(f.Key, bytes.NewReader(data), oss.ContentType("image/png"))
+			// 上传到 OSS (带前缀)
+			ossKey := prefix + f.Key
+			err = bucket.PutObject(ossKey, bytes.NewReader(data), oss.ContentType("image/png"))
 			if err != nil {
 				result.Error = fmt.Errorf("上传失败: %w", err)
 			} else {
@@ -302,6 +312,7 @@ func printUsage() {
 
 选项:
   --local         本地缓存目录 (默认: ./cache)
+  --oss-prefix    OSS 存储前缀 (默认: latex/)
   --oss-endpoint  OSS endpoint (必填)
   --oss-bucket    OSS bucket 名称 (必填)
   --oss-access-key  OSS access key (必填)
@@ -312,20 +323,21 @@ func printUsage() {
   --help, -h      显示帮助信息
 
 环境变量:
-  OSS_ENDPOINT, OSS_BUCKET, OSS_ACCESS_KEY, OSS_SECRET_KEY, OSS_DOMAIN
+  OSS_ENDPOINT, OSS_BUCKET, OSS_ACCESS_KEY, OSS_SECRET_KEY, OSS_DOMAIN, OSS_PREFIX
 
 示例:
   # 预览迁移
   %s --dry-run
 
-  # 执行迁移
-  %s --oss-endpoint oss-cn-hangzhou.aliyuncs.com --oss-bucket my-bucket --oss-access-key xxx --oss-secret-key xxx
+  # 执行迁移 (使用自定义前缀)
+  %s --oss-prefix assets/latex/ --oss-endpoint oss-cn-hangzhou.aliyuncs.com --oss-bucket my-bucket --oss-access-key xxx --oss-secret-key xxx
 
   # 使用环境变量
   export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
   export OSS_BUCKET=my-bucket
   export OSS_ACCESS_KEY=xxx
   export OSS_SECRET_KEY=xxx
+  export OSS_PREFIX=assets/latex/
   %s
 
 `, version, os.Args[0], runtime.NumCPU(), os.Args[0], os.Args[0], os.Args[0])

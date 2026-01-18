@@ -134,6 +134,9 @@ func LoadFromEnv() (*Config, error) {
 			cfg.Cache.OSS.TTL = d
 		}
 	}
+	if v := os.Getenv("OSS_PREFIX"); v != "" {
+		cfg.Cache.OSS.Prefix = v
+	}
 
 	// 本地缓存配置
 	if v := os.Getenv("CACHE_LOCAL_DIR"); v != "" {
@@ -229,7 +232,8 @@ func Default() *Config {
 				TTL: 168 * time.Hour,
 			},
 			OSS: cache.OSSConfig{
-				TTL: 168 * time.Hour,
+				Prefix: "latex/",
+				TTL:    168 * time.Hour,
 			},
 		},
 		Chrome: ChromeConfig{

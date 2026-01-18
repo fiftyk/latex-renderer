@@ -130,8 +130,12 @@ export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
 export OSS_BUCKET=your-bucket
 export OSS_ACCESS_KEY=your-access-key
 export OSS_SECRET_KEY=your-secret-key
+export OSS_PREFIX=assets/latex/  # 可选，自定义存储路径前缀
 ./latex-renderer
 ```
+
+**OSS 存储路径**: `Bucket/OSS_PREFIX + latex/{hash}.png`
+例如: `my-bucket/assets/latex/abc123.png`
 
 **验证切换**: 查看启动日志，确认显示 `[缓存] 使用本地缓存` 或 `[缓存] 使用 OSS 缓存`。
 

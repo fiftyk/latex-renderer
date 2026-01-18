@@ -181,8 +181,12 @@ export OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
 export OSS_BUCKET=your-bucket
 export OSS_ACCESS_KEY=your-access-key
 export OSS_SECRET_KEY=your-secret-key
+export OSS_PREFIX=assets/latex/  # 可选，自定义存储路径前缀
 ./latex-renderer
 ```
+
+**OSS 存储路径**: `Bucket/OSS_PREFIX + latex/{hash}.png`
+例如: `my-bucket/assets/latex/abc123.png`
 
 **切换后**: 新缓存会写入新位置，原有缓存不会自动迁移。如需迁移已有缓存，参考下方"缓存迁移"章节。
 
@@ -221,6 +225,7 @@ go run scripts/migrate_cache.go             # 执行
 | 选项 | 默认值 | 说明 |
 |------|--------|------|
 | `--local` | ./cache | 本地缓存目录 |
+| `--oss-prefix` | latex/ | OSS 存储前缀 |
 | `--oss-endpoint` | - | OSS endpoint (必填) |
 | `--oss-bucket` | - | OSS bucket 名称 (必填) |
 | `--oss-access-key` | - | OSS access key (必填) |

@@ -42,6 +42,7 @@ type OSSConfig struct {
 	AccessKey   string `yaml:"access_key" env:"OSS_ACCESS_KEY"`
 	SecretKey   string `yaml:"secret_key" env:"OSS_SECRET_KEY"`
 	Domain      string `yaml:"domain" env:"OSS_DOMAIN"`
+	Prefix      string `yaml:"prefix" env:"OSS_PREFIX"`       // 存储前缀，如 "assets/latex/"
 	TTL         time.Duration `yaml:"ttl" env:"OSS_TTL"`
 }
 
