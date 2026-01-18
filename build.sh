@@ -39,15 +39,15 @@ echo ""
 echo "=== 构建并推送镜像 ==="
 cd "$BUILD_DIR"
 
-# 检查Podman登录状态
-if ! podman info > /dev/null 2>&1; then
-  echo "错误: Podman未运行"
+# 检查Docker守护进程状态
+if ! docker info > /dev/null 2>&1; then
+  echo "错误: Docker未运行"
   exit 1
 fi
 
 # 构建镜像
 echo "构建镜像..."
-podman build \
+docker build \
   -t "$FULL_IMAGE_NAME" \
   --build-arg DOCKER_REGISTRY=docker.m.daocloud.io \
   .
@@ -58,7 +58,7 @@ if [ $BUILD_STATUS -eq 0 ]; then
   echo ""
   echo "推送镜像..."
   # 推送镜像
-  podman push "$FULL_IMAGE_NAME"
+  docker push "$FULL_IMAGE_NAME"
   BUILD_STATUS=$?
 fi
 
