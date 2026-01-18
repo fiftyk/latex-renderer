@@ -37,11 +37,11 @@ type ChromeConfig struct {
 type RendererConfig struct {
 	MaxRequests      int64         `mapstructure:"max_requests"`      // 每多少个请求后重启浏览器
 	MaxInterval      time.Duration `mapstructure:"max_interval"`      // 最大间隔时间后重启浏览器
-	RenderTimeout   time.Duration `mapstructure:"render_timeout"`   // 单次渲染超时时间
-	MaxRetries      int           `mapstructure:"max_retries"`     // 渲染失败最大重试次数
-	QueueSize       int           `mapstructure:"queue_size"`       // 并发队列大小
-	QueueTimeout    time.Duration `mapstructure:"queue_timeout"`    // 排队超时时间
-	OverloadStrategy string       `mapstructure:"overload_strategy"` // 过载处理策略 (failfast/queue)
+	RenderTimeout    time.Duration `mapstructure:"render_timeout"`    // 单次渲染超时时间
+	MaxRetries       int           `mapstructure:"max_retries"`       // 渲染失败最大重试次数
+	QueueSize        int           `mapstructure:"queue_size"`        // 并发队列大小
+	QueueTimeout     time.Duration `mapstructure:"queue_timeout"`     // 排队超时时间
+	OverloadStrategy string        `mapstructure:"overload_strategy"` // 过载处理策略 (failfast/queue)
 }
 
 // LogConfig 日志配置
@@ -54,10 +54,10 @@ type LogConfig struct {
 
 // cacheConfig 缓存配置
 type cacheConfig struct {
-	Type   string               `mapstructure:"type"`
-	TTL    time.Duration        `mapstructure:"ttl"`
-	Local  cache.LocalConfig    `mapstructure:"local"`
-	OSS    cache.OSSConfig      `mapstructure:"oss"`
+	Type  string            `mapstructure:"type"`
+	TTL   time.Duration     `mapstructure:"ttl"`
+	Local cache.LocalConfig `mapstructure:"local"`
+	OSS   cache.OSSConfig   `mapstructure:"oss"`
 }
 
 // Load 加载配置
@@ -240,20 +240,20 @@ func Default() *Config {
 			Args: "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage",
 		},
 		Renderer: RendererConfig{
-			MaxRequests:       100,               // 每100个请求重启浏览器
-			MaxInterval:       30 * time.Minute,  // 每30分钟重启浏览器
-			RenderTimeout:     30 * time.Second,  // 单次渲染超时30秒
-			MaxRetries:        2,                 // 最多重试2次
-			QueueSize:         8,                 // 默认队列大小
-			QueueTimeout:      5 * time.Second,   // 默认排队超时5秒
-			OverloadStrategy:  "queue",           // 默认使用排队策略
+			MaxRequests:      50,               // 每50个请求重启浏览器（低内存优化）
+			MaxInterval:      10 * time.Minute, // 每10分钟重启浏览器（低内存优化）
+			RenderTimeout:    30 * time.Second, // 单次渲染超时30秒
+			MaxRetries:       2,                // 最多重试2次
+			QueueSize:        4,                // 默认队列大小（低内存优化）
+			QueueTimeout:     10 * time.Second, // 默认排队超时10秒
+			OverloadStrategy: "queue",          // 默认使用排队策略
 		},
 		Log: LogConfig{
 			MaxSize:  100,
 			MaxFiles: 3,
 			Level:    "info",
 		},
-		MaxConcurrent: 16, // 默认最多 16 个并发（基于性能测试结果）
+		MaxConcurrent: 2, // 默认最多 2 个并发（适合 2GB 服务器）
 	}
 }
 
@@ -293,13 +293,13 @@ func setDefaults(cfg *Config) {
 		cfg.Log.Level = "info"
 	}
 	if cfg.MaxConcurrent <= 0 {
-		cfg.MaxConcurrent = 16
+		cfg.MaxConcurrent = 2 // 适合 2GB 服务器
 	}
 	if cfg.Renderer.MaxRequests <= 0 {
-		cfg.Renderer.MaxRequests = 100
+		cfg.Renderer.MaxRequests = 50 // 更频繁重启以清理内存
 	}
 	if cfg.Renderer.MaxInterval <= 0 {
-		cfg.Renderer.MaxInterval = 30 * time.Minute
+		cfg.Renderer.MaxInterval = 10 * time.Minute // 更频繁重启以清理内存
 	}
 	if cfg.Renderer.RenderTimeout <= 0 {
 		cfg.Renderer.RenderTimeout = 30 * time.Second
@@ -308,10 +308,10 @@ func setDefaults(cfg *Config) {
 		cfg.Renderer.MaxRetries = 2
 	}
 	if cfg.Renderer.QueueSize <= 0 {
-		cfg.Renderer.QueueSize = 8
+		cfg.Renderer.QueueSize = 4 // 低内存优化
 	}
 	if cfg.Renderer.QueueTimeout <= 0 {
-		cfg.Renderer.QueueTimeout = 5 * time.Second
+		cfg.Renderer.QueueTimeout = 10 * time.Second // 增加超时时间以配合低并发
 	}
 	if cfg.Renderer.OverloadStrategy == "" {
 		cfg.Renderer.OverloadStrategy = "queue"

@@ -29,7 +29,7 @@ RUN mkdir -p /app/cache /app/logs && \
     chown -R appuser:appuser /app
 
 # 设置环境变量
-ENV CHROME_ARGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu"
+ENV CHROME_ARGS="--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --single-process --disable-background-networking --disable-background-timer-throttling --disable-breakpad --disable-sync --metrics-recording-only --mute-audio"
 ENV CHROME_EXECUTABLE_PATH=
 ENV WORKDIR=/app
 

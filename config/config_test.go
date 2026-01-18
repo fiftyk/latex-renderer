@@ -39,15 +39,15 @@ func TestDefault(t *testing.T) {
 		t.Errorf("Log.Level should be 'info', got %s", cfg.Log.Level)
 	}
 	// 验证并发默认值
-	if cfg.MaxConcurrent != 16 {
-		t.Errorf("MaxConcurrent should be 16, got %d", cfg.MaxConcurrent)
+	if cfg.MaxConcurrent != 2 {
+		t.Errorf("MaxConcurrent should be 2, got %d", cfg.MaxConcurrent)
 	}
 	// 验证渲染器默认值
-	if cfg.Renderer.MaxRequests != 100 {
-		t.Errorf("Renderer.MaxRequests should be 100, got %d", cfg.Renderer.MaxRequests)
+	if cfg.Renderer.MaxRequests != 50 {
+		t.Errorf("Renderer.MaxRequests should be 50, got %d", cfg.Renderer.MaxRequests)
 	}
-	if cfg.Renderer.MaxInterval != 30*time.Minute {
-		t.Errorf("Renderer.MaxInterval should be 30m, got %v", cfg.Renderer.MaxInterval)
+	if cfg.Renderer.MaxInterval != 10*time.Minute {
+		t.Errorf("Renderer.MaxInterval should be 10m, got %v", cfg.Renderer.MaxInterval)
 	}
 	if cfg.Renderer.RenderTimeout != 30*time.Second {
 		t.Errorf("Renderer.RenderTimeout should be 30s, got %v", cfg.Renderer.RenderTimeout)

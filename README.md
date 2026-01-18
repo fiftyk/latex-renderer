@@ -120,6 +120,57 @@ docker run -d --name latex-renderer \
 
 **注意**: 容器内已配置 `--no-sandbox` 参数，无需额外安全选项。
 
+### 低内存服务器部署 (2GB)
+
+对于内存有限的服务器（2GB 或更少），请使用以下推荐配置以避免 OOM 错误：
+
+**使用部署脚本（推荐）**:
+
+```bash
+# 一键部署（适合 2GB 服务器）
+./deploy-low-memory.sh
+
+# 或指定自定义镜像
+./deploy-low-memory.sh your-registry/latex-renderer:tag
+```
+
+**手动部署**:
+
+```bash
+docker run -d --name latex-renderer \
+  --memory="1536m" \
+  --memory-swap="1536m" \
+  --restart=unless-stopped \
+  -e MAX_CONCURRENT=2 \
+  -e RENDERER_MAX_REQUESTS=50 \
+  -e RENDERER_MAX_INTERVAL=10m \
+  -e RENDERER_OVERLOAD_STRATEGY=queue \
+  -e RENDERER_QUEUE_SIZE=4 \
+  -e RENDERER_QUEUE_TIMEOUT=10s \
+  -p 8080:8080 \
+  crpi-vrqfzo6fw9cp7rqe-vpc.cn-wulanchabu.personal.cr.aliyuncs.com/fiftyk/latex-renderer:latest
+
+# 监控内存使用
+docker stats latex-renderer
+
+# 查看日志
+docker logs -f latex-renderer
+```
+
+**内存配置指南**:
+
+| 服务器内存 | MAX_CONCURRENT | Docker 内存限制 | 预期 QPS |
+|-----------|----------------|----------------|---------|
+| 2GB       | 2 (默认)        | 1536m          | 2-4     |
+| 4GB       | 4-6            | 3072m          | 10-20   |
+| 8GB+      | 8-16           | 6144m+         | 30-50+  |
+
+**重要说明**:
+- **内存限制**: 建议设置为服务器总内存的 75%，为操作系统和其他进程预留空间
+- **并发数**: 在 2GB 服务器上，默认值已优化为 2，可防止 OOM 错误
+- **监控**: 部署后建议监控内存使用，确保容器内存保持在 800MB 以下
+- **性能权衡**: 低内存配置会降低吞吐量，但保证服务稳定性
+
 ## 配置
 
 ### 环境变量
@@ -139,18 +190,18 @@ docker run -d --name latex-renderer \
 | `OSS_DOMAIN` | 否 | - | OSS 自定义域名 |
 | `OSS_TTL` | 否 | 168h | OSS 缓存过期时间 |
 | `CHROME_EXECUTABLE_PATH` | 否 | 自动查找 | Chrome 可执行文件路径 |
-| `CHROME_ARGS` | 否 | `--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage` | Chrome 启动参数 |
+| `CHROME_ARGS` | 否 | 见 Dockerfile | Chrome 启动参数（已优化低内存） |
 | `LOG_PATH` | 否 | - | 日志文件路径，留空则输出到 stdout |
 | `LOG_LEVEL` | 否 | info | 日志级别 (debug/info/warn/error) |
 | `LOG_MAX_SIZE` | 否 | 100 | 单个日志文件最大尺寸 (MB) |
 | `LOG_MAX_FILES` | 否 | 3 | 保留的日志文件数量 |
-| `MAX_CONCURRENT` | 否 | 4 | 最大并发请求数 |
-| `RENDERER_MAX_REQUESTS` | 否 | 100 | 浏览器重启请求阈值 |
-| `RENDERER_MAX_INTERVAL` | 否 | 30m | 浏览器重启时间阈值 |
+| `MAX_CONCURRENT` | 否 | 2 | 最大并发请求数（2GB 服务器优化）|
+| `RENDERER_MAX_REQUESTS` | 否 | 50 | 浏览器重启请求阈值（低内存优化）|
+| `RENDERER_MAX_INTERVAL` | 否 | 10m | 浏览器重启时间阈值（低内存优化）|
 | `RENDERER_TIMEOUT` | 否 | 30s | 单次渲染超时时间 |
 | `RENDERER_MAX_RETRIES` | 否 | 2 | 渲染失败最大重试次数 |
-| `RENDERER_QUEUE_SIZE` | 否 | 8 | 排队策略的队列大小 |
-| `RENDERER_QUEUE_TIMEOUT` | 否 | 5s | 排队策略的等待超时时间 |
+| `RENDERER_QUEUE_SIZE` | 否 | 4 | 排队策略的队列大小（低内存优化）|
+| `RENDERER_QUEUE_TIMEOUT` | 否 | 10s | 排队策略的等待超时时间 |
 | `RENDERER_OVERLOAD_STRATEGY` | 否 | queue | 过载处理策略 (failfast/queue) |
 
 ### 日志配置示例
@@ -286,11 +337,12 @@ RENDERER_QUEUE_TIMEOUT=3s
 
 ### 默认配置
 - **策略**: `queue` (超时排队)
-- **并发数**: `16` (基于性能测试优化)
-- **队列大小**: `8`
-- **排队超时**: `5s`
+- **并发数**: `2` (适合 2GB 服务器)
+- **队列大小**: `4`
+- **排队超时**: `10s`
+- **浏览器重启**: 每 50 个请求或 10 分钟
 
-**注意**: 默认并发数已从4优化为16，可提供161%的性能提升（基于测试结果）。
+**注意**: 默认配置已优化为低内存模式，适合 2GB 服务器。如需更高性能，请在更大内存服务器上增加 `MAX_CONCURRENT` 值（4GB 服务器建议 4-6，8GB+ 建议 8-16）。
 
 ## 性能数据
 
