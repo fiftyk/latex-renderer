@@ -107,10 +107,23 @@ func main() {
 		}
 	}()
 
-	// 等待静态服务器启动
-	time.Sleep(500 * time.Millisecond)
-
+	// 等待静态服务器启动（使用健康检查而非固定延迟）
 	staticBaseURL := fmt.Sprintf("http://%s", staticAddr)
+	maxRetries := 10
+	for i := 0; i < maxRetries; i++ {
+		resp, err := http.Get(staticBaseURL + "/katex/katex.min.css")
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				log.Printf("静态文件服务器已启动: %s", staticBaseURL)
+				break
+			}
+		}
+		if i == maxRetries-1 {
+			log.Printf("警告: 静态文件服务器启动超时，继续尝试...")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 
 	// 初始化渲染器（传入配置）
 	r, err := renderer.NewRenderer(&renderer.RendererOptions{
