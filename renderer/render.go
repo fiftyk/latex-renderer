@@ -138,37 +138,30 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 	// 生成 HTML
 	html := r.htmlGenerator.GenerateHTML(opts.Latex, background, padding, fontSize, color)
 
-	// 使用复用的 allocator context 创建新 browser context（tab）
-	browserCtx, cancel := chromedp.NewContext(r.browserManager.getAllocatorContext())
-	defer cancel()
-
-	// 设置超时
-	renderCtx, cancel := context.WithTimeout(browserCtx, r.renderTimeout)
-	defer cancel()
-
 	// 执行渲染 - 添加重试机制
 	var buf []byte
 	var err error
 
 	// 最多重试 maxRetries 次
 	for attempt := 0; attempt < r.maxRetries; attempt++ {
+		// 重试时先取消旧的 context
 		if attempt > 0 {
-			// 重试前重启浏览器
 			log.Println("渲染失败，重启浏览器...")
 			if restartErr := r.browserManager.restartBrowser(ctx); restartErr != nil {
 				return nil, fmt.Errorf("重启浏览器失败: %w", restartErr)
 			}
-			// 重新初始化
 			if initErr := r.browserManager.initBrowser(ctx); initErr != nil {
 				return nil, initErr
 			}
-			// 创建新的browser context
-			browserCtx, cancel = chromedp.NewContext(r.browserManager.getAllocatorContext())
-			defer cancel()
-			renderCtx, cancel = context.WithTimeout(browserCtx, r.renderTimeout)
-			defer cancel()
 		}
 
+		// 使用复用的 allocator context 创建新 browser context（tab）
+		browserCtx, cancelBrowser := chromedp.NewContext(r.browserManager.getAllocatorContext())
+
+		// 设置超时
+		renderCtx, cancelRender := context.WithTimeout(browserCtx, r.renderTimeout)
+
+		// 执行渲染
 		err = chromedp.Run(renderCtx,
 			emulation.SetDeviceMetricsOverride(1920, 1080, 1.0, false),
 			chromedp.Navigate(`data:text/html,`+html),
@@ -177,9 +170,13 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 			chromedp.Screenshot(`#wrapper`, &buf, chromedp.ByQuery),
 		)
 
+		// 立即清理 context
+		cancelRender()
+		cancelBrowser()
+
 		if err == nil {
 			// 成功！
-			break
+			return buf, nil
 		}
 
 		// 如果是最后一次尝试，返回错误
@@ -188,10 +185,11 @@ func (r *Renderer) Render(ctx context.Context, opts *RenderOptions) ([]byte, err
 		}
 
 		// 短暂延迟后重试
+		log.Printf("渲染失败，%dms 后重试...", 500)
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	return buf, nil
+	return nil, fmt.Errorf("渲染失败 (尝试 %d 次): %w", r.maxRetries, err)
 }
 
 // RenderToPNG 渲染为 PNG
