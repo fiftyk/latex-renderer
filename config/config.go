@@ -78,13 +78,11 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("读取配置文件失败: %w", err)
 	}
 
-	cfg := &Config{}
+	// 从默认配置开始，确保所有默认值一致
+	cfg := Default()
 	if err := viper.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("解析配置文件失败: %w", err)
 	}
-
-	// 设置默认值
-	setDefaults(cfg)
 
 	return cfg, nil
 }
@@ -254,66 +252,5 @@ func Default() *Config {
 			Level:    "info",
 		},
 		MaxConcurrent: 2, // 默认最多 2 个并发（适合 2GB 服务器）
-	}
-}
-
-// setDefaults 设置默认值
-func setDefaults(cfg *Config) {
-	if cfg.Server.Port == 0 {
-		cfg.Server.Port = 8080
-	}
-	if cfg.Server.Host == "" {
-		cfg.Server.Host = "0.0.0.0"
-	}
-	if cfg.Cache.Type == "" {
-		cfg.Cache.Type = "local"
-	}
-	if cfg.Cache.TTL == 0 {
-		cfg.Cache.TTL = 168 * time.Hour
-	}
-	if cfg.Cache.Local.Dir == "" {
-		cfg.Cache.Local.Dir = "./cache"
-	}
-	if cfg.Cache.Local.TTL == 0 {
-		cfg.Cache.Local.TTL = 168 * time.Hour
-	}
-	if cfg.Cache.OSS.TTL == 0 {
-		cfg.Cache.OSS.TTL = 168 * time.Hour
-	}
-	if cfg.Chrome.Args == "" {
-		cfg.Chrome.Args = "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage"
-	}
-	if cfg.Log.MaxSize == 0 {
-		cfg.Log.MaxSize = 100
-	}
-	if cfg.Log.MaxFiles == 0 {
-		cfg.Log.MaxFiles = 3
-	}
-	if cfg.Log.Level == "" {
-		cfg.Log.Level = "info"
-	}
-	if cfg.MaxConcurrent <= 0 {
-		cfg.MaxConcurrent = 2 // 适合 2GB 服务器
-	}
-	if cfg.Renderer.MaxRequests <= 0 {
-		cfg.Renderer.MaxRequests = 50 // 更频繁重启以清理内存
-	}
-	if cfg.Renderer.MaxInterval <= 0 {
-		cfg.Renderer.MaxInterval = 10 * time.Minute // 更频繁重启以清理内存
-	}
-	if cfg.Renderer.RenderTimeout <= 0 {
-		cfg.Renderer.RenderTimeout = 30 * time.Second
-	}
-	if cfg.Renderer.MaxRetries <= 0 {
-		cfg.Renderer.MaxRetries = 2
-	}
-	if cfg.Renderer.QueueSize <= 0 {
-		cfg.Renderer.QueueSize = 4 // 低内存优化
-	}
-	if cfg.Renderer.QueueTimeout <= 0 {
-		cfg.Renderer.QueueTimeout = 10 * time.Second // 增加超时时间以配合低并发
-	}
-	if cfg.Renderer.OverloadStrategy == "" {
-		cfg.Renderer.OverloadStrategy = "queue"
 	}
 }
