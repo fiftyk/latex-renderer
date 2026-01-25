@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// TimeoutQueueConfig TimeoutQueueStrategy 配置（用于测试）
+type TimeoutQueueConfig struct {
+	Limit     int
+	QueueSize int
+	Timeout   time.Duration
+}
+
 // OverloadStrategy 并发满时的处理策略接口
 type OverloadStrategy interface {
 	// Handle 尝试获取信号量，返回 true 表示获取成功
@@ -73,11 +80,15 @@ func NewTimeoutQueueStrategy(limit int, queueSize int, timeout time.Duration) Ov
 }
 
 func (s *TimeoutQueueStrategy) Handle() bool {
+	// 使用 timer 避免 time.After 导致的内存泄漏
+	timer := time.NewTimer(s.timeout)
+	defer timer.Stop()
+
 	// 尝试获取信号量，支持排队
 	select {
 	case s.sem <- struct{}{}:
 		return true
-	case <-time.After(s.timeout):
+	case <-timer.C:
 		// 超时
 		return false
 	}
