@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -133,7 +134,7 @@ func (c *OSSCache) Set(ctx context.Context, key string, data []byte, ttl time.Du
 	}
 
 	// 上传对象
-	err := c.bucket.PutObject(ossKey, strings.NewReader(string(data)), opts...)
+	err := c.bucket.PutObject(ossKey, bytes.NewReader(data), opts...)
 	if err != nil {
 		return fmt.Errorf("上传 OSS 对象失败: %w", err)
 	}
