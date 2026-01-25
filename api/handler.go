@@ -184,7 +184,7 @@ func (h *Handler) Render(c *gin.Context) {
 	// 写入缓存
 	log.Printf("[缓存] 写入缓存: %s", sanitizeCacheKey(cacheKey))
 	if err := h.cache.Set(c.Request.Context(), cacheKey, data, h.ttl); err != nil {
-		log.Printf("[缓存] 写入缓存失败: %s", sanitizeCacheKey(cacheKey))
+		log.Printf("[缓存] 写入缓存失败: %s, err=%v", sanitizeCacheKey(cacheKey), err)
 		c.Writer.Header().Set("X-Cache-Status", "write-error")
 	} else {
 		log.Printf("[缓存] 写入缓存成功: %s", sanitizeCacheKey(cacheKey))
