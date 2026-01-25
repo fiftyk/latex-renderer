@@ -285,3 +285,56 @@ func TestLocalCache_TTLExpired(t *testing.T) {
 		t.Errorf("Expired cache file should be deleted")
 	}
 }
+
+func TestLocalCache_PathTraversal(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "latex-cache-test")
+	if err != nil {
+		t.Fatalf("创建临时目录失败: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// 创建另一个目录用于测试
+	attackDir, err := os.MkdirTemp("", "latex-attack-test")
+	if err != nil {
+		t.Fatalf("创建攻击目录失败: %v", err)
+	}
+	defer os.RemoveAll(attackDir)
+
+	cfg := LocalConfig{
+		Dir: tmpDir,
+		TTL: 10 * time.Minute,
+	}
+
+	cache, err := NewLocalCache(&cfg)
+	if err != nil {
+		t.Fatalf("创建缓存失败: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// 尝试路径遍历攻击：使用 ../ 访问缓存目录外的文件
+	maliciousKey := "../../../" + filepath.Base(attackDir) + "/pwned.png"
+
+	// 写入恶意路径
+	err = cache.Set(ctx, maliciousKey, []byte("malicious data"), 10*time.Minute)
+	if err != nil {
+		// 正确行为：应该拒绝路径遍历攻击
+		return
+	}
+
+	// 验证攻击目录中没有创建文件（如果创建了说明存在漏洞）
+	attackPath := filepath.Join(attackDir, "pwned.png")
+	if _, err := os.Stat(attackPath); err == nil {
+		t.Errorf("Path traversal attack succeeded: file was created outside cache directory")
+	}
+
+	// 验证数据仍在缓存目录内（路径被清理后存储）
+	expectedPath := filepath.Join(tmpDir, "pwned.png")
+	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
+		// 目录结构可能不同，验证最终路径在缓存目录内即可
+		cleanedPath := filepath.Join(tmpDir, filepath.Base(attackDir), "pwned.png")
+		if _, err := os.Stat(cleanedPath); err != nil {
+			t.Errorf("Data should be stored inside cache directory")
+		}
+	}
+}

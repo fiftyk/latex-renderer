@@ -11,6 +11,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// MockStrategy 模拟过载策略用于测试
+type MockStrategy struct {
+	shouldAccept bool
+}
+
+func (m *MockStrategy) Handle() bool {
+	return m.shouldAccept
+}
+
+func (m *MockStrategy) Release() {}
+
+func (m *MockStrategy) Reject() error {
+	return nil
+}
+
 // MockCache 模拟缓存用于测试
 type MockCache struct {
 	data map[string][]byte
@@ -62,8 +77,9 @@ func TestRender_MissingLatex(t *testing.T) {
 
 	// 创建处理器
 	handler := &Handler{
-		cache: mockCache,
-		ttl:   24 * time.Hour,
+		cache:            mockCache,
+		ttl:              24 * time.Hour,
+		overloadStrategy: &MockStrategy{shouldAccept: true},
 	}
 
 	router.GET("/api", handler.Render)
@@ -95,8 +111,9 @@ func TestRender_InvalidFormat(t *testing.T) {
 	mockCache := NewMockCache()
 
 	handler := &Handler{
-		cache: mockCache,
-		ttl:   24 * time.Hour,
+		cache:            mockCache,
+		ttl:              24 * time.Hour,
+		overloadStrategy: &MockStrategy{shouldAccept: true},
 	}
 
 	router.GET("/api", handler.Render)
@@ -125,8 +142,9 @@ func TestHealth(t *testing.T) {
 	mockCache := NewMockCache()
 
 	handler := &Handler{
-		cache: mockCache,
-		ttl:   24 * time.Hour,
+		cache:            mockCache,
+		ttl:              24 * time.Hour,
+		overloadStrategy: &MockStrategy{shouldAccept: true},
 	}
 
 	router.GET("/health", handler.Health)
@@ -157,8 +175,9 @@ func TestInfo(t *testing.T) {
 	mockCache := NewMockCache()
 
 	handler := &Handler{
-		cache: mockCache,
-		ttl:   24 * time.Hour,
+		cache:            mockCache,
+		ttl:              24 * time.Hour,
+		overloadStrategy: &MockStrategy{shouldAccept: true},
 	}
 
 	router.GET("/info", handler.Info)
@@ -192,8 +211,9 @@ func TestSetupRoutes(t *testing.T) {
 	mockCache := NewMockCache()
 
 	handler := &Handler{
-		cache: mockCache,
-		ttl:   24 * time.Hour,
+		cache:            mockCache,
+		ttl:              24 * time.Hour,
+		overloadStrategy: &MockStrategy{shouldAccept: true},
 	}
 
 	SetupRoutes(router, handler)

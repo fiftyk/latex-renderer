@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -193,6 +194,23 @@ func (c *LocalCache) GetURL(ctx context.Context, key string) (string, error) {
 }
 
 // getPath 获取文件路径
+// 防止路径遍历攻击：确保 key 始终在缓存目录内
 func (c *LocalCache) getPath(key string) string {
-	return filepath.Join(c.dir, key)
+	// 清理 key 中的路径遍历字符
+	key = filepath.ToSlash(key)
+	key = strings.TrimPrefix(key, "/")
+	// 移除所有 .. 分量
+	parts := strings.Split(key, "/")
+	var cleanParts []string
+	for _, part := range parts {
+		if part == ".." {
+			continue
+		}
+		if part != "" {
+			cleanParts = append(cleanParts, part)
+		}
+	}
+	cleanKey := strings.Join(cleanParts, "/")
+
+	return filepath.Join(c.dir, cleanKey)
 }
