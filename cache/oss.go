@@ -97,13 +97,15 @@ func (c *OSSCache) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, fmt.Errorf("获取 OSS 对象元数据失败: %w", err)
 	}
 
-	// 检查是否过期
-	if lastModified := props.Get("Last-Modified"); lastModified != "" {
-		t, err := time.Parse(http.TimeFormat, lastModified)
-		if err == nil && time.Since(t) > c.ttl {
-			// 删除过期缓存
-			c.bucket.DeleteObject(ossKey)
-			return nil, nil
+	// 检查是否过期（TTL <= 0 表示永不过期）
+	if c.ttl > 0 {
+		if lastModified := props.Get("Last-Modified"); lastModified != "" {
+			t, err := time.Parse(http.TimeFormat, lastModified)
+			if err == nil && time.Since(t) > c.ttl {
+				// 删除过期缓存
+				c.bucket.DeleteObject(ossKey)
+				return nil, nil
+			}
 		}
 	}
 
@@ -126,12 +128,14 @@ func (c *OSSCache) Get(ctx context.Context, key string) ([]byte, error) {
 // Set 设置缓存
 func (c *OSSCache) Set(ctx context.Context, key string, data []byte, ttl time.Duration) error {
 	ossKey := c.buildKey(key)
-	// 设置过期时间
-	expiry := time.Now().Add(ttl)
-	opts := []oss.Option{
-		oss.Expires(expiry),
-		oss.ContentType("image/png"),
+
+	var opts []oss.Option
+	// 只有 TTL > 0 才设置 OSS 对象过期时间
+	if ttl > 0 {
+		expiry := time.Now().Add(ttl)
+		opts = append(opts, oss.Expires(expiry))
 	}
+	opts = append(opts, oss.ContentType("image/png"))
 
 	// 上传对象
 	err := c.bucket.PutObject(ossKey, bytes.NewReader(data), opts...)

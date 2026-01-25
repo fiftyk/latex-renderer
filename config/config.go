@@ -18,6 +18,7 @@ type Config struct {
 	Chrome        ChromeConfig   `mapstructure:"chrome"`
 	Renderer      RendererConfig `mapstructure:"renderer"`
 	Log           LogConfig      `mapstructure:"log"`
+	Batch         BatchConfig    `mapstructure:"batch"`
 	MaxConcurrent int            `mapstructure:"max_concurrent"` // 最大并发数
 }
 
@@ -58,6 +59,14 @@ type cacheConfig struct {
 	TTL   time.Duration     `mapstructure:"ttl"`
 	Local cache.LocalConfig `mapstructure:"local"`
 	OSS   cache.OSSConfig   `mapstructure:"oss"`
+}
+
+// BatchConfig 批量渲染配置
+type BatchConfig struct {
+	Enabled     bool          `mapstructure:"enabled"`       // 是否启用批量渲染
+	BatchSize   int           `mapstructure:"batch_size"`    // 批量大小阈值
+	BatchWindow time.Duration `mapstructure:"batch_window"`  // 时间窗口
+	QueueSize   int           `mapstructure:"queue_size"`    // 队列缓冲大小
 }
 
 // Load 加载配置
@@ -212,6 +221,29 @@ func LoadFromEnv() (*Config, error) {
 		cfg.Renderer.OverloadStrategy = v
 	}
 
+	// 批量渲染配置
+	if v := os.Getenv("BATCH_ENABLED"); v != "" {
+		cfg.Batch.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("BATCH_SIZE"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+			cfg.Batch.BatchSize = n
+		}
+	}
+	if v := os.Getenv("BATCH_WINDOW"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err == nil {
+			cfg.Batch.BatchWindow = d
+		}
+	}
+	if v := os.Getenv("BATCH_QUEUE_SIZE"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+			cfg.Batch.QueueSize = n
+		}
+	}
+
 	return cfg, nil
 }
 
@@ -250,6 +282,12 @@ func Default() *Config {
 			MaxSize:  100,
 			MaxFiles: 3,
 			Level:    "info",
+		},
+		Batch: BatchConfig{
+			Enabled:     false,
+			BatchSize:   10,
+			BatchWindow: 100 * time.Millisecond,
+			QueueSize:   100,
 		},
 		MaxConcurrent: 2, // 默认最多 2 个并发（适合 2GB 服务器）
 	}

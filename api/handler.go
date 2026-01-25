@@ -19,11 +19,12 @@ type Handler struct {
 	cache            cache.Cache
 	ttl              time.Duration
 	overloadStrategy renderer.OverloadStrategy
+	batchRenderer    renderer.BatchRendererInterface
 	staticBaseURL    string // 静态资源基础URL
 }
 
 // NewHandler 创建处理器
-func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration, strategy renderer.OverloadStrategy, staticBaseURL ...string) *Handler {
+func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration, strategy renderer.OverloadStrategy, batchRenderer renderer.BatchRendererInterface, staticBaseURL ...string) *Handler {
 	var baseURL string
 	if len(staticBaseURL) > 0 {
 		baseURL = staticBaseURL[0]
@@ -33,6 +34,7 @@ func NewHandler(r *renderer.Renderer, c cache.Cache, ttl time.Duration, strategy
 		cache:            c,
 		ttl:              ttl,
 		overloadStrategy: strategy,
+		batchRenderer:    batchRenderer,
 		staticBaseURL:    baseURL,
 	}
 }
@@ -98,7 +100,9 @@ func (h *Handler) Render(c *gin.Context) {
 	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.FontSize, req.Padding)
 
 	// 尝试从缓存获取
-	data, err := h.cache.Get(c.Request.Context(), cacheKey)
+	var data []byte
+	var err error
+	data, err = h.cache.Get(c.Request.Context(), cacheKey)
 	if err != nil {
 		log.Printf("[缓存] 读取缓存失败: %s", sanitizeCacheKey(cacheKey))
 		c.Writer.Header().Set("X-Cache-Status", "read-error")
@@ -132,11 +136,34 @@ func (h *Handler) Render(c *gin.Context) {
 	log.Printf("[缓存] 缓存未命中")
 
 	// 缓存未命中，渲染图片
-	data, err = h.renderer.RenderToPNG(c.Request.Context(), &renderer.RenderOptions{
-		Latex:    req.Latex,
-		FontSize: req.FontSize,
-		Padding:  req.Padding,
-	})
+	if h.batchRenderer != nil {
+		// 使用批量渲染
+		resultCh, enqueueErr := h.batchRenderer.Enqueue(c.Request.Context(), &renderer.RenderOptions{
+			Latex:    req.Latex,
+			FontSize: req.FontSize,
+			Padding:  req.Padding,
+		})
+		if enqueueErr != nil {
+			log.Printf("[批量] 入队失败: %v", enqueueErr)
+			c.JSON(http.StatusServiceUnavailable, RenderResponse{
+				Success: false,
+				Message: "服务繁忙，请稍后重试",
+			})
+			return
+		}
+
+		// 等待结果
+		result := <-resultCh
+		data, err = result.Data, result.Err
+	} else {
+		// 直接渲染
+		data, err = h.renderer.RenderToPNG(c.Request.Context(), &renderer.RenderOptions{
+			Latex:    req.Latex,
+			FontSize: req.FontSize,
+			Padding:  req.Padding,
+		})
+	}
+
 	if err != nil {
 		// 记录详细错误日志（内部），LaTeX 可能很长，只显示前 50 字符
 		latexPreview := req.Latex

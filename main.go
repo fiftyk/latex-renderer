@@ -90,6 +90,15 @@ func main() {
 		overloadStrategy = renderer.NewFailFastStrategy(maxConcurrent)
 	}
 
+	// 批量渲染配置
+	var batchRenderer renderer.BatchRendererInterface
+	if cfg.Batch.Enabled {
+		log.Printf("批量渲染: 已启用, 批量大小=%d, 时间窗口=%v, 队列大小=%d",
+			cfg.Batch.BatchSize, cfg.Batch.BatchWindow, cfg.Batch.QueueSize)
+	} else {
+		log.Printf("批量渲染: 未启用")
+	}
+
 	// 启动静态文件HTTP服务器（用于KaTeX资源）
 	staticServerPort := 9090
 	staticAddr := fmt.Sprintf("127.0.0.1:%d", staticServerPort)
@@ -150,8 +159,19 @@ func main() {
 		log.Println("Chrome 浏览器预热完成")
 	}
 
+	// 初始化批量渲染器（需要在实际渲染器之后）
+	if cfg.Batch.Enabled {
+		batchConfig := &renderer.BatchConfig{
+			BatchSize:   cfg.Batch.BatchSize,
+			BatchWindow: cfg.Batch.BatchWindow,
+			QueueSize:   cfg.Batch.QueueSize,
+		}
+		batchRenderer = renderer.NewBatchRenderer(r, batchConfig)
+		batchRenderer.Start()
+	}
+
 	// 初始化处理器
-	handler := api.NewHandler(r, cacheImpl, cfg.Cache.TTL, overloadStrategy, staticBaseURL)
+	handler := api.NewHandler(r, cacheImpl, cfg.Cache.TTL, overloadStrategy, batchRenderer, staticBaseURL)
 
 	// 设置 Gin 模式
 	gin.SetMode(gin.ReleaseMode)
@@ -199,6 +219,14 @@ func main() {
 	log.Println("关闭静态文件服务器...")
 	if err := staticServer.Shutdown(shutdownCtx); err != nil {
 		log.Printf("关闭静态文件服务器失败: %v", err)
+	}
+
+	// 关闭批量渲染器
+	if batchRenderer != nil {
+		log.Println("关闭批量渲染器...")
+		if err := batchRenderer.Stop(); err != nil {
+			log.Printf("关闭批量渲染器失败: %v", err)
+		}
 	}
 
 	log.Println("服务器已关闭")

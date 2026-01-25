@@ -83,16 +83,18 @@ func (c *LocalCache) Get(ctx context.Context, key string) ([]byte, error) {
 
 	log.Printf("[缓存-本地] 缓存文件信息: key=%s, path=%s, size=%d bytes, modTime=%v, ttl=%v", key, path, info.Size(), info.ModTime(), c.ttl)
 
-	// 检查是否过期
-	if time.Since(info.ModTime()) > c.ttl {
-		log.Printf("[缓存-本地] 缓存已过期: key=%s, age=%v, ttl=%v", key, time.Since(info.ModTime()), c.ttl)
-		// 删除过期缓存
-		if err := os.Remove(path); err != nil {
-			log.Printf("[缓存-本地] 删除过期缓存失败: key=%s, err=%v", key, err)
-		} else {
-			log.Printf("[缓存-本地] 删除过期缓存成功: key=%s", key)
+	// 检查是否过期（TTL <= 0 表示永不过期）
+	if c.ttl > 0 {
+		if time.Since(info.ModTime()) > c.ttl {
+			log.Printf("[缓存-本地] 缓存已过期: key=%s, age=%v, ttl=%v", key, time.Since(info.ModTime()), c.ttl)
+			// 删除过期缓存
+			if err := os.Remove(path); err != nil {
+				log.Printf("[缓存-本地] 删除过期缓存失败: key=%s, err=%v", key, err)
+			} else {
+				log.Printf("[缓存-本地] 删除过期缓存成功: key=%s", key)
+			}
+			return nil, nil
 		}
-		return nil, nil
 	}
 
 	// 读取文件（添加权限检查）
