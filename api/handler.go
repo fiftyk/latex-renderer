@@ -97,16 +97,14 @@ func (h *Handler) Render(c *gin.Context) {
 	// 生成缓存 key
 	cacheKey := cache.GenerateCacheKey(req.Latex, req.Format, req.FontSize, req.Padding)
 
-	log.Printf("[缓存] 尝试获取缓存: key=%s", cacheKey)
-
 	// 尝试从缓存获取
 	data, err := h.cache.Get(c.Request.Context(), cacheKey)
 	if err != nil {
-		log.Printf("[缓存] 读取缓存失败: key=%s, err=%v", cacheKey, err)
+		log.Printf("[缓存] 读取缓存失败: %s", sanitizeCacheKey(cacheKey))
 		c.Writer.Header().Set("X-Cache-Status", "read-error")
 	} else if data != nil {
 		// 缓存命中
-		log.Printf("[缓存] 缓存命中: key=%s, size=%d bytes", cacheKey, len(data))
+		log.Printf("[缓存] 缓存命中: %s, size=%d bytes", sanitizeCacheKey(cacheKey), len(data))
 
 		// 生成 ETag (基于内容的MD5)
 		etag := fmt.Sprintf(`"%x"`, md5.Sum(data))
@@ -114,7 +112,7 @@ func (h *Handler) Render(c *gin.Context) {
 		// 检查客户端是否已经有最新版本
 		if_none_match := c.GetHeader("If-None-Match")
 		if if_none_match == etag {
-			log.Printf("[缓存] ETag 匹配，返回 304: key=%s, etag=%s", cacheKey, etag)
+			log.Printf("[缓存] ETag 匹配，返回 304")
 			c.Writer.Header().Set("ETag", etag)
 			c.Writer.Header().Set("X-Cache-Status", "hit")
 			c.Writer.Header().Set("Cache-Control", "public, max-age=31536000")
@@ -124,14 +122,14 @@ func (h *Handler) Render(c *gin.Context) {
 		}
 
 		// 返回完整响应
-		log.Printf("[缓存] 返回缓存内容: key=%s, etag=%s", cacheKey, etag)
+		log.Printf("[缓存] 返回缓存内容: %s", sanitizeCacheKey(cacheKey))
 		c.Writer.Header().Set("ETag", etag)
 		c.Writer.Header().Set("X-Cache-Status", "hit")
 		h.writeImage(c, data)
 		return
 	}
 
-	log.Printf("[缓存] 缓存未命中，开始渲染: key=%s", cacheKey)
+	log.Printf("[缓存] 缓存未命中")
 
 	// 缓存未命中，渲染图片
 	data, err = h.renderer.RenderToPNG(c.Request.Context(), &renderer.RenderOptions{
@@ -140,8 +138,12 @@ func (h *Handler) Render(c *gin.Context) {
 		Padding:  req.Padding,
 	})
 	if err != nil {
-		// 记录详细错误日志（内部）
-		log.Printf("[渲染] 渲染失败: latex=%s, err=%v", req.Latex, err)
+		// 记录详细错误日志（内部），LaTeX 可能很长，只显示前 50 字符
+		latexPreview := req.Latex
+		if len(latexPreview) > 50 {
+			latexPreview = latexPreview[:50] + "..."
+		}
+		log.Printf("[渲染] 渲染失败: latex=%s, err=%v", latexPreview, err)
 		// 返回脱敏的错误信息（不暴露内部细节）
 		c.JSON(http.StatusInternalServerError, RenderResponse{
 			Success: false,
@@ -150,15 +152,15 @@ func (h *Handler) Render(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[渲染] 渲染成功: key=%s, size=%d bytes", cacheKey, len(data))
+	log.Printf("[渲染] 渲染成功: %s, size=%d bytes", sanitizeCacheKey(cacheKey), len(data))
 
 	// 写入缓存
-	log.Printf("[缓存] 写入缓存: key=%s", cacheKey)
+	log.Printf("[缓存] 写入缓存: %s", sanitizeCacheKey(cacheKey))
 	if err := h.cache.Set(c.Request.Context(), cacheKey, data, h.ttl); err != nil {
-		log.Printf("[缓存] 写入缓存失败: key=%s, err=%v", cacheKey, err)
+		log.Printf("[缓存] 写入缓存失败: %s", sanitizeCacheKey(cacheKey))
 		c.Writer.Header().Set("X-Cache-Status", "write-error")
 	} else {
-		log.Printf("[缓存] 写入缓存成功: key=%s", cacheKey)
+		log.Printf("[缓存] 写入缓存成功: %s", sanitizeCacheKey(cacheKey))
 		c.Writer.Header().Set("X-Cache-Status", "miss")
 	}
 
@@ -204,3 +206,11 @@ func (h *Handler) Info(c *gin.Context) {
 }
 
 var startTime = time.Now()
+
+// sanitizeCacheKey 对缓存 key 进行脱敏处理，只保留前 8 个字符
+func sanitizeCacheKey(key string) string {
+	if len(key) <= 8 {
+		return "***"
+	}
+	return key[:8] + "***"
+}
