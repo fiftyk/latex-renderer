@@ -140,10 +140,12 @@ func (h *Handler) Render(c *gin.Context) {
 		Padding:  req.Padding,
 	})
 	if err != nil {
+		// 记录详细错误日志（内部）
 		log.Printf("[渲染] 渲染失败: latex=%s, err=%v", req.Latex, err)
+		// 返回脱敏的错误信息（不暴露内部细节）
 		c.JSON(http.StatusInternalServerError, RenderResponse{
 			Success: false,
-			Message: fmt.Sprintf("渲染失败: %v", err),
+			Message: "渲染失败，请稍后重试",
 		})
 		return
 	}
